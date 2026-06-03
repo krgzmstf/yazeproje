@@ -1,0 +1,122 @@
+# ──────────────────────────────────────────────────────────────
+# YAZE Proje – Docker Compose (Development)
+# ──────────────────────────────────────────────────────────────
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: yaze-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yaze_user
+      POSTGRES_PASSWORD: yaze_password
+      POSTGRES_DB: yaze_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaze_user -d yaze_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yaze-network
+
+  # ── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: yaze-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yaze-network
+
+  # ── Backend (FastAPI) ──────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yaze-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      DEBUG: "true"
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+    networks:
+      - yaze-network
+
+  # ── Frontend (Next.js / React) ─────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: yaze-frontend
+    working_dir: /app/frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+      - frontend_node_modules:/app/frontend/node_modules
+    command: sh -c "npm install && npm run dev"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    networks:
+      - yaze-network
+
+  # ── Nginx (Reverse Proxy) ─────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: yaze-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - yaze-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
+  frontend_node_modules:
+
+networks:
+  yaze-network:
+    driver: bridge
