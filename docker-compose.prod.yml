@@ -38,22 +38,18 @@ services:
     restart: always
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: https://yazeproje.com/api/v1
-    container_name: yaze-frontend
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://yazeproje.com/api/v1
-    restart: always
+    # Hosted on Vercel, not run on the server
+    image: alpine
+    entrypoint: ["echo", "Frontend is hosted on Vercel"]
+    restart: "no"
 
   nginx:
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - certbot_webroot:/var/www/certbot:ro
+    depends_on:
+      - backend
     restart: always
 
   # ── Certbot (Let's Encrypt) ────────────────────────────────
@@ -68,7 +64,7 @@ services:
         certbot certonly --webroot -w /var/www/certbot
         --email ercang@yazeproje.com
         --agree-tos --no-eff-email
-        -d yazeproje.com -d www.yazeproje.com
+        -d api.yazeproje.com
         && trap exit TERM;
         while :; do certbot renew; sleep 12h & wait $${!}; done
       "
@@ -79,5 +75,4 @@ volumes:
   postgres_data:
   redis_data:
   backend_uploads:
-  frontend_node_modules:
   certbot_webroot:
