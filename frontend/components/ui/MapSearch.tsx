@@ -136,7 +136,7 @@ export default function MapSearch({ listings, onBoundsChange }: MapSearchProps) 
     });
   }, [listings]);
 
-  const triggerBoundsChange = () => {
+  function triggerBoundsChange() {
     if (!mapRef.current) return;
     const bounds = mapRef.current.getBounds();
     const southWest = bounds.getSouthWest();
@@ -148,7 +148,7 @@ export default function MapSearch({ listings, onBoundsChange }: MapSearchProps) 
       min_lng: southWest.lng,
       max_lng: northEast.lng,
     });
-  };
+  }
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border border-gold/15 shadow-xl bg-navy-dark min-h-[350px] lg:min-h-0">

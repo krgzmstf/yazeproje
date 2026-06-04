@@ -81,7 +81,7 @@ interface HeaderProps {
 }
 
 export default function Header({ settings = {} }: HeaderProps) {
-  const navItems = settings.nav_items || defaultNavItems;
+  const navItems: NavItem[] = settings.nav_items || defaultNavItems;
   const pathname = usePathname();
   const isHome = pathname === "/";
   const [isOpen, setIsOpen] = useState(false);

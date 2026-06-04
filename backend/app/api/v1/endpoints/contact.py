@@ -80,3 +80,74 @@ async def subscribe(
         "message": "Abonelik kaydı tamamlandı.",
         "details": responses
     }
+
+
+# ── Contact Messages Endpoints ────────────────────────────────────────
+
+from app.models.contact import ContactMessage, ContactMessageStatus
+from app.schemas.contact import ContactMessageCreate, ContactMessageResponse
+from app.models.user import UserRole
+from app.api.v1.endpoints.auth import RoleChecker
+
+allow_admin_or_editor = Depends(RoleChecker([UserRole.ADMIN, UserRole.EDITOR]))
+allow_admin = Depends(RoleChecker([UserRole.ADMIN]))
+
+
+@router.post("/contact-messages", status_code=status.HTTP_201_CREATED, response_model=ContactMessageResponse)
+async def submit_contact_message(
+    payload: ContactMessageCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submit a contact / quote request message. Saves it to the database.
+    """
+    db_msg = ContactMessage(
+        full_name=payload.full_name,
+        email=payload.email,
+        phone=payload.phone,
+        subject=payload.subject,
+        message=payload.message,
+        status=ContactMessageStatus.UNREAD
+    )
+    db.add(db_msg)
+    await db.commit()
+    await db.refresh(db_msg)
+    return db_msg
+
+
+@router.get("/contact-messages", response_model=list[ContactMessageResponse], dependencies=[allow_admin_or_editor])
+async def get_contact_messages(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve all contact messages. Protected (Admin / Editor).
+    """
+    query = select(ContactMessage).order_by(ContactMessage.created_at.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.delete("/contact-messages/{id}", dependencies=[allow_admin])
+async def delete_contact_message(
+    id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a contact message. Protected (Admin only).
+    """
+    from uuid import UUID
+    try:
+        uuid_id = UUID(id)
+        query = select(ContactMessage).where(ContactMessage.id == uuid_id)
+    except ValueError:
+        query = select(ContactMessage).where(ContactMessage.id == id)
+        
+    result = await db.execute(query)
+    msg = result.scalars().first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Mesaj bulunamadı.")
+    
+    await db.delete(msg)
+    await db.commit()
+    return {"message": "Mesaj başarıyla silindi."}
+

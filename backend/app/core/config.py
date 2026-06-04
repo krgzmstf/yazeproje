@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     API_V1_PREFIX: str = "/api/v1"
     ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:1001",
+        "http://127.0.0.1:1001",
         "http://localhost:3000",
         "http://localhost:8000",
         "https://yazeproje.com",

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { 
   Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut, 
   User, ShieldCheck, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
-  TrendingUp, Activity, CheckCircle2, Clock, Eye, AlertCircle, Laptop
+  TrendingUp, Activity, CheckCircle2, Clock, Eye, AlertCircle, Laptop, Mail
 } from "lucide-react";
 
 interface UserProfile {
@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
   const [software, setSoftware] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   
   // UX States
   const [loading, setLoading] = useState(true);
@@ -161,6 +162,17 @@ export default function DashboardPage() {
         }
       });
       if (resSoft.ok) setSoftware(await resSoft.json());
+
+      // Fetch contact messages
+      const parsedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      if (parsedUser.role === "admin" || parsedUser.role === "editor") {
+        const resMsg = await fetch(`${apiBase}/contact-messages`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`
+          }
+        });
+        if (resMsg.ok) setMessages(await resMsg.json());
+      }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
     } finally {
@@ -182,12 +194,13 @@ export default function DashboardPage() {
     if (tabName === "listings" && user.role === "agent") return true;
     if (tabName === "news" && user.role === "editor") return true;
     if (tabName === "software" && user.role === "developer") return true;
+    if (tabName === "messages" && (user.role === "admin" || user.role === "editor")) return true;
     if (tabName === "overview") return true;
     return false;
   };
 
   // CRUD Actions
-  const handleDelete = async (type: "projects" | "listings" | "news" | "software", id: string) => {
+  const handleDelete = async (type: "projects" | "listings" | "news" | "software" | "contact-messages", id: string) => {
     if (!window.confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
 
     try {
@@ -671,6 +684,21 @@ export default function DashboardPage() {
                   <span>Site Ayarları (CMS)</span>
                 </div>
                 <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "settings" ? "text-navy-dark" : "text-gold"}`} />
+              </button>
+            )}
+
+            {hasAccess("messages") && (
+              <button
+                onClick={() => { setActiveTab("messages"); setSearchQuery(""); }}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                  activeTab === "messages" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Mail className="w-4 h-4" />
+                  <span>Gelen Mesajlar</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "messages" ? "text-navy-dark" : "text-gold"}`} />
               </button>
             )}
           </nav>
@@ -1907,6 +1935,92 @@ export default function DashboardPage() {
                   </form>
                 )}
 
+              </div>
+            )}
+
+            {activeTab === "messages" && (
+              <div className="space-y-6 animate-fade-in-up">
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-5">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">İletişim & Teklif Mesajları</h2>
+                    <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Ziyaretçiler tarafından gönderilen teklif ve iletişim talepleri</p>
+                  </div>
+                </div>
+
+                {/* Filter / Search Controls */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-navy/60 border border-gold/5 p-4 rounded-xl">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-cream/40" />
+                    <input
+                      type="text"
+                      placeholder="Mesajlarda ara (İsim, konu, mesaj içeriği)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-9 pr-4 py-2.5 text-xs text-cream outline-none placeholder-cream/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Messages List */}
+                <div className="bg-navy border border-gold/10 rounded-xl overflow-hidden shadow-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-navy-dark text-[9px] uppercase font-bold text-gold/70 border-b border-gold/10 tracking-widest">
+                          <th className="p-4">Gönderen</th>
+                          <th className="p-4">İletişim Bilgileri</th>
+                          <th className="p-4">İlgi Alanı / Konu</th>
+                          <th className="p-4">Mesaj</th>
+                          <th className="p-4 text-right">Eylemler</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gold/5">
+                        {messages
+                          .filter(msg => 
+                            !searchQuery ||
+                            (msg.full_name && msg.full_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (msg.subject && msg.subject.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (msg.message && msg.message.toLowerCase().includes(searchQuery.toLowerCase()))
+                          )
+                          .map((msg) => (
+                            <tr key={msg.id} className="hover:bg-navy-dark/40 transition-colors">
+                              <td className="p-4 font-semibold text-cream">{msg.full_name}</td>
+                              <td className="p-4">
+                                <div className="space-y-1">
+                                  <div className="text-cream/80">{msg.email}</div>
+                                  {msg.phone && <div className="text-cream/50">{msg.phone}</div>}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <span className="bg-gold/10 text-gold px-2.5 py-1 rounded font-semibold uppercase text-[9px] tracking-wider">
+                                  {msg.subject === "yapi" ? "Yapı & İnşaat" : msg.subject === "mimarlik" ? "Mimarlık & Tasarım" : msg.subject === "gayrimenkul" ? "Gayrimenkul" : msg.subject === "yazilim" ? "Yazılım Çözümleri" : msg.subject}
+                                </span>
+                              </td>
+                              <td className="p-4 text-cream/70 max-w-sm whitespace-pre-wrap leading-relaxed">{msg.message}</td>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end space-x-3">
+                                  {user.role === "admin" && (
+                                    <button
+                                      onClick={() => handleDelete("contact-messages", msg.id)}
+                                      className="p-1.5 bg-navy-dark hover:bg-red-950/20 border border-gold/10 hover:border-red-500/30 text-cream/60 hover:text-red-400 rounded transition-all"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        {messages.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-8 text-center text-cream/35 italic">Henüz hiç mesaj bulunmuyor.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
           </>

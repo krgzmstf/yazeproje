@@ -14,7 +14,7 @@ services:
       POSTGRES_PASSWORD: yaze_password
       POSTGRES_DB: yaze_db
     ports:
-      - "5432:5432"
+      - "1004:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,7 +31,7 @@ services:
     container_name: yaze-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "1003:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -57,10 +57,15 @@ services:
       DEBUG: "true"
       ENVIRONMENT: development
     ports:
-      - "8000:8000"
+      - "1002:1002"
     volumes:
       - ./backend:/app
       - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1002/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,7 +74,7 @@ services:
     command: >
       uvicorn app.main:app
       --host 0.0.0.0
-      --port 8000
+      --port 1002
       --reload
     networks:
       - yaze-network
@@ -81,14 +86,14 @@ services:
     working_dir: /app/frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "1001:1001"
     volumes:
       - ./frontend:/app/frontend
       - frontend_node_modules:/app/frontend/node_modules
     command: sh -c "npm install && npm run dev"
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_API_URL: http://localhost:1002/api/v1
     depends_on:
       - backend
     networks:
@@ -100,8 +105,8 @@ services:
     container_name: yaze-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "1000:80"
+      - "1005:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro

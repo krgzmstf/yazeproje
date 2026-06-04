@@ -11,7 +11,7 @@ import {
   AlertCircle,
   MessageSquare,
 } from "lucide-react";
-import { subscribe } from "@/lib/api";
+import { subscribe, submitContactMessage } from "@/lib/api";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -42,14 +42,16 @@ export default function ContactPage() {
     setErrorMsg("");
 
     try {
-      // Register subscription on backend (newsletter/SMS integration)
-      const res = await subscribe({
-        email: formData.email || undefined,
+      // Submit contact message details
+      const res = await submitContactMessage({
+        full_name: formData.fullName,
+        email: formData.email,
         phone: formData.phone || undefined,
-        full_name: formData.fullName || undefined,
+        subject: formData.subject,
+        message: formData.message,
       });
 
-      if (res.status === "success") {
+      if (res.id) {
         setSuccess(true);
         setFormData({
           fullName: "",
@@ -59,7 +61,7 @@ export default function ContactPage() {
           message: "",
         });
       } else {
-        setErrorMsg(res.message || "Kaydedilirken bir hata oluştu.");
+        setErrorMsg("Mesaj kaydedilirken bir hata oluştu.");
       }
     } catch (error: any) {
       console.error("Contact form submit failed:", error);

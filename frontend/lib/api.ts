@@ -6,7 +6,7 @@
 const API_BASE_URL =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:8000/api/v1";
+  "http://localhost:1002/api/v1";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -463,4 +463,54 @@ export async function deleteSoftwareProduct(
     next: undefined,
   });
 }
+
+// ── Contact Messages ──────────────────────────────────────────────────
+
+export interface ContactMessage {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  subject: string;
+  message: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function submitContactMessage(payload: {
+  full_name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+}): Promise<ContactMessage> {
+  return apiFetch<ContactMessage>("/contact-messages", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+}
+
+export async function getContactMessages(token: string): Promise<ContactMessage[]> {
+  return apiFetch<ContactMessage[]>("/contact-messages", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function deleteContactMessage(id: string, token: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/contact-messages/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
 
