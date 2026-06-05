@@ -27,7 +27,9 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = typeof window !== "undefined" && window.location.hostname.includes("yazeproje.com")
+        ? "https://api.yazeproje.com/api/v1"
+        : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:1002/api/v1");
       const response = await fetch(`${apiBase}/auth/login`, {
         method: "POST",
         headers: {

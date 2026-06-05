@@ -23,6 +23,15 @@ const MapSelector = dynamic(() => import("@/components/ui/MapSelector"), {
   loading: () => <div className="w-full h-[220px] bg-navy-dark rounded-xl flex items-center justify-center text-[10px] text-cream/40">Seçici Yükleniyor...</div>
 });
 
+const getApiBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    if (window.location.hostname.includes("yazeproje.com")) {
+      return "https://api.yazeproje.com/api/v1";
+    }
+  }
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:1002/api/v1";
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -132,7 +141,7 @@ export default function DashboardPage() {
   const fetchData = async (authToken: string) => {
     setLoading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       // Validate token with auth/me
       const resMe = await fetch(`${apiBase}/auth/me`, {
         headers: {
@@ -230,7 +239,7 @@ export default function DashboardPage() {
     if (!window.confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/${type}/${id}`, {
         method: "DELETE",
         headers: {
@@ -259,7 +268,7 @@ export default function DashboardPage() {
     uploadData.append("file", file);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/upload/image`, {
         method: "POST",
         headers: {
@@ -292,7 +301,7 @@ export default function DashboardPage() {
     uploadData.append("file", file);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/upload/file`, {
         method: "POST",
         headers: {
@@ -367,7 +376,7 @@ export default function DashboardPage() {
     uploadData.append("file", file);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/upload/image`, {
         method: "POST",
         headers: {
@@ -496,7 +505,7 @@ export default function DashboardPage() {
     uploadData.append("file", file);
 
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const endpoint = isImage ? "/upload/image" : "/upload/file";
       const res = await fetch(`${apiBase}${endpoint}`, {
         method: "POST",
@@ -681,7 +690,7 @@ export default function DashboardPage() {
                 ? "announcements"
                 : "events";
       const method = editId ? "PUT" : "POST";
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const apiBase = getApiBaseUrl();
       const hasNoTrailingSlash = path === "news" || path === "announcements" || path === "events";
       const url = editId 
         ? `${apiBase}/${path}/${editId}` 
@@ -2159,7 +2168,7 @@ export default function DashboardPage() {
                                           {item.href && (
                                             <div className="flex items-center space-x-1.5 text-[8px] text-gold">
                                               <span>Mevcut Dosya/Bağlantı:</span>
-                                              <a href={item.href.startsWith("http") ? item.href : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}${item.href}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-gold-light truncate max-w-md">
+                                              <a href={item.href.startsWith("http") ? item.href : `${getApiBaseUrl()}${item.href}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-gold-light truncate max-w-md">
                                                 {item.href}
                                               </a>
                                             </div>

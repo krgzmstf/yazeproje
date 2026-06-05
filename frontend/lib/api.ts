@@ -6,7 +6,11 @@
 const API_BASE_URL =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:1002/api/v1";
+  (typeof window !== "undefined" && window.location.hostname.includes("yazeproje.com")
+    ? "https://api.yazeproje.com/api/v1"
+    : (process.env.NODE_ENV === "production"
+      ? "https://api.yazeproje.com/api/v1"
+      : "http://localhost:1002/api/v1"));
 
 // ── Types ─────────────────────────────────────────────────────────
 
