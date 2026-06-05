@@ -180,7 +180,7 @@ async def register(
 
     # Generate 6-digit random code
     verification_code = f"{secrets.randbelow(900000) + 100000}"
-    verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
 
     # Check if user already exists
     result = await db.execute(select(User).where(User.email == payload.email.lower()))
@@ -376,12 +376,10 @@ async def verify_email(
     await db.commit()
     
     # Check expiry
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc)
+    from datetime import datetime
+    now = datetime.utcnow()
     
     expires_at = user.verification_code_expires_at
-    if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
         
     if not user.verification_code or expires_at < now:
         raise HTTPException(
@@ -441,7 +439,7 @@ async def resend_verification(
     
     # Generate new code
     verification_code = f"{secrets.randbelow(900000) + 100000}"
-    verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
     
     user.verification_code = verification_code
     user.verification_code_expires_at = verification_code_expires_at
