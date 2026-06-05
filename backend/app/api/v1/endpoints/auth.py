@@ -6,7 +6,11 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import decode_token, create_access_token, verify_password, hash_password
 from app.models.user import User, UserRole
-from app.schemas.user import UserLogin, Token, UserResponse, UserCreate, ForgotPasswordRequest, ResetPasswordRequest, UserProfileUpdate
+from app.schemas.user import (
+    UserLogin, Token, UserResponse, UserCreate,
+    ForgotPasswordRequest, ResetPasswordRequest, UserProfileUpdate,
+    EmailVerifyRequest, ResendVerifyRequest
+)
 from app.core.email import send_email
 
 router = APIRouter()
@@ -100,6 +104,12 @@ async def login(
             detail="Hesabınız askıya alınmıştır.",
         )
         
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Hesabınız doğrulanmamıştır. Lütfen e-postanıza gönderilen doğrulama kodunu girerek hesabınızı aktifleştirin.",
+        )
+        
     # Generate token
     access_token = create_access_token(
         subject=str(user.id),
@@ -163,30 +173,85 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Register a new user with default SUBSCRIBER role.
+    Register a new user with default SUBSCRIBER role and send email verification code.
     """
+    import secrets
+    from datetime import datetime, timedelta, timezone
+
+    # Generate 6-digit random code
+    verification_code = f"{secrets.randbelow(900000) + 100000}"
+    verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+
     # Check if user already exists
-    result = await db.execute(select(User).where(User.email == payload.email))
-    if result.scalars().first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var.",
-        )
+    result = await db.execute(select(User).where(User.email == payload.email.lower()))
+    existing_user = result.scalars().first()
     
-    # Create new user
-    new_user = User(
-        email=payload.email,
-        password_hash=hash_password(payload.password),
-        full_name=payload.full_name,
-        phone=payload.phone,
-        role=UserRole.SUBSCRIBER,
-        is_active=True,
-        is_verified=False
-    )
-    db.add(new_user)
+    if existing_user:
+        if existing_user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var.",
+            )
+        else:
+            # Overwrite unverified user registration details to allow re-registration
+            existing_user.full_name = payload.full_name
+            existing_user.password_hash = hash_password(payload.password)
+            existing_user.phone = payload.phone
+            existing_user.verification_code = verification_code
+            existing_user.verification_code_expires_at = verification_code_expires_at
+            existing_user.verification_attempts = 0
+            user_to_send = existing_user
+    else:
+        # Create new user
+        new_user = User(
+            email=payload.email.lower(),
+            password_hash=hash_password(payload.password),
+            full_name=payload.full_name,
+            phone=payload.phone,
+            role=UserRole.SUBSCRIBER,
+            is_active=True,
+            is_verified=False,
+            verification_code=verification_code,
+            verification_code_expires_at=verification_code_expires_at,
+            verification_attempts=0
+        )
+        db.add(new_user)
+        user_to_send = new_user
+
     await db.commit()
-    await db.refresh(new_user)
-    return new_user
+    await db.refresh(user_to_send)
+
+    # Send verification email
+    html_content = f"""
+    <html>
+        <body style="font-family: sans-serif; padding: 20px; color: #1e293b; background-color: #f8fafc;">
+            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <h2 style="color: #0f172a; text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-top: 0;">YAZE PROJE</h2>
+                <p style="font-size: 16px; line-height: 1.6;">Merhaba <strong>{user_to_send.full_name}</strong>,</p>
+                <p style="font-size: 16px; line-height: 1.6;">YAZE Proje platformuna kayıt olduğunuz için teşekkür ederiz. Kayıt işleminizi tamamlamak için lütfen aşağıdaki 6 haneli doğrulama kodunu kullanın:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #d97706; background-color: #fef3c7; padding: 15px 30px; border-radius: 8px; border: 1px solid #fde68a;">
+                        {verification_code}
+                    </span>
+                </div>
+                <p style="font-size: 14px; color: #64748b; text-align: center;">Bu kod <strong>15 dakika</strong> geçerlidir. Güvenliğiniz için bu kodu kimseyle paylaşmayın.</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5;">
+                    Bu e-posta YAZE Proje kayıt doğrulaması için gönderilmiştir. Kayıt işlemini siz başlatmadıysanız lütfen bu e-postayı dikkate almayın.
+                </p>
+            </div>
+        </body>
+    </html>
+    """
+    
+    email_sent = await send_email(user_to_send.email, "YAZE Proje - E-posta Doğrulama Kodu", html_content)
+    if not email_sent:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Doğrulama kodu e-postası gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+        )
+
+    return user_to_send
 
 
 @router.post("/forgot-password")
@@ -273,4 +338,148 @@ async def reset_password(
     return {
         "status": "success",
         "message": "Şifreniz başarıyla sıfırlandı."
+    }
+
+
+@router.post("/verify-email")
+async def verify_email(
+    payload: EmailVerifyRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Verify a user's email using the 6-digit code sent.
+    """
+    result = await db.execute(select(User).where(User.email == payload.email.lower()))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı.",
+        )
+        
+    if user.is_verified:
+        return {
+            "status": "success",
+            "message": "E-posta adresi zaten doğrulanmış."
+        }
+        
+    # Check brute-force attempts
+    if user.verification_attempts >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Çok fazla başarısız deneme gerçekleştirdiniz. Lütfen yeni bir doğrulama kodu talep edin.",
+        )
+        
+    # Increment attempts
+    user.verification_attempts += 1
+    await db.commit()
+    
+    # Check expiry
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    
+    expires_at = user.verification_code_expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+    if not user.verification_code or expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Doğrulama kodunun süresi dolmuş veya kod geçersiz. Lütfen yeni bir kod isteyin.",
+        )
+        
+    if user.verification_code != payload.code:
+        if user.verification_attempts >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Doğrulama kodu hatalı. 3 başarısız deneme sınırı aşıldı. Lütfen yeni bir kod isteyin.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Doğrulama kodu hatalı. Kalan deneme hakkı: {3 - user.verification_attempts}",
+        )
+        
+    # Verification successful!
+    user.is_verified = True
+    user.verification_code = None
+    user.verification_code_expires_at = None
+    user.verification_attempts = 0
+    await db.commit()
+    
+    return {
+        "status": "success",
+        "message": "E-posta adresiniz başarıyla doğrulandı. Artık giriş yapabilirsiniz."
+    }
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    payload: ResendVerifyRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Resend verification email to an unverified user.
+    """
+    result = await db.execute(select(User).where(User.email == payload.email.lower()))
+    user = result.scalars().first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı.",
+        )
+        
+    if user.is_verified:
+        return {
+            "status": "success",
+            "message": "E-posta adresi zaten doğrulanmış."
+        }
+        
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    
+    # Generate new code
+    verification_code = f"{secrets.randbelow(900000) + 100000}"
+    verification_code_expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
+    
+    user.verification_code = verification_code
+    user.verification_code_expires_at = verification_code_expires_at
+    user.verification_attempts = 0
+    
+    await db.commit()
+    
+    # HTML Email template
+    html_content = f"""
+    <html>
+        <body style="font-family: sans-serif; padding: 20px; color: #1e293b; background-color: #f8fafc;">
+            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+                <h2 style="color: #0f172a; text-align: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-top: 0;">YAZE PROJE</h2>
+                <p style="font-size: 16px; line-height: 1.6;">Merhaba <strong>{user.full_name}</strong>,</p>
+                <p style="font-size: 16px; line-height: 1.6;">Hesap doğrulaması için talep ettiğiniz yeni 6 haneli doğrulama kodunuz:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #d97706; background-color: #fef3c7; padding: 15px 30px; border-radius: 8px; border: 1px solid #fde68a;">
+                        {verification_code}
+                    </span>
+                </div>
+                <p style="font-size: 14px; color: #64748b; text-align: center;">Bu kod <strong>15 dakika</strong> geçerlidir. Güvenliğiniz için bu kodu kimseyle paylaşmayın.</p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+                <p style="font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.5;">
+                    Bu e-posta YAZE Proje kayıt doğrulaması için gönderilmiştir. Kayıt işlemini siz başlatmadıysanız lütfen bu e-postayı dikkate almayın.
+                </p>
+            </div>
+        </body>
+    </html>
+    """
+    
+    email_sent = await send_email(user.email, "YAZE Proje - Yeni Doğrulama Kodu", html_content)
+    if not email_sent:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Doğrulama kodu e-postası gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+        )
+        
+    return {
+        "status": "success",
+        "message": "Doğrulama kodu e-posta adresinize tekrar gönderildi."
     }

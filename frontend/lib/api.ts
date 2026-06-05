@@ -560,3 +560,21 @@ export async function resetPassword(token: string, password: string): Promise<{ 
 }
 
 
+export async function verifyEmail(email: string, code: string): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+    cache: "no-store",
+  });
+}
+
+
+export async function resendVerificationCode(email: string): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>("/auth/resend-verification", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    cache: "no-store",
+  });
+}
+
+

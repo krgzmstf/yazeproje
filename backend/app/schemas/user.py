@@ -58,3 +58,13 @@ class UserProfileUpdate(BaseModel):
     phone: str | None = None
     password: str | None = None
 
+
+class EmailVerifyRequest(BaseModel):
+    email: str
+    code: str
+
+
+class ResendVerifyRequest(BaseModel):
+    email: str
+
+
