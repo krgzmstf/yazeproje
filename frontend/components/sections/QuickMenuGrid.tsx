@@ -53,7 +53,7 @@ const defaultQuickMenuItems = [
     icon: Bot,
     title: "YazeSYM",
     desc: "Yapay zeka emlak robotu takip modülü.",
-    link: "https://yazeproje.com/yazesym",
+    link: "https://yazesym.yazeproje.com",
   },
 ];
 
@@ -78,7 +78,7 @@ export default function QuickMenuGrid({ settings = {} }: QuickMenuGridProps) {
                 href={item.link}
                 target={item.link.startsWith("http") ? "_blank" : undefined}
                 rel={item.link.startsWith("http") ? "noopener noreferrer" : undefined}
-                className="group relative transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center pt-2"
+                className="group relative transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center p-5 md:p-6 bg-white/85 hover:bg-white/95 backdrop-blur-md border border-white/50 rounded-2xl shadow-lg hover:shadow-xl hover:shadow-navy-dark/10 transition-all duration-300"
               >
                 {/* Icon */}
                 <div className="flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:-translate-y-1 text-gold group-hover:drop-shadow-[0_0_12px_rgba(212,175,55,0.6)]">
@@ -86,10 +86,10 @@ export default function QuickMenuGrid({ settings = {} }: QuickMenuGridProps) {
                 </div>
                 
                 {/* Title & Desc */}
-                <h3 className="font-playfair font-bold text-cream text-base mb-2 group-hover:text-gold transition-colors duration-200">
+                <h3 className="font-playfair font-bold text-navy-dark text-sm mb-2 group-hover:text-navy transition-colors duration-200">
                   {item.title}
                 </h3>
-                <p className="text-xs text-cream/70 leading-relaxed font-light px-2">
+                <p className="text-[11px] text-navy-light/80 leading-relaxed font-normal px-1">
                   {item.desc}
                 </p>
               </a>

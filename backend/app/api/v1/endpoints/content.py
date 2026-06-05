@@ -43,6 +43,19 @@ async def get_news(
     return articles
 
 
+@router.get("/news/admin", response_model=list[AutomatedNewsResponse], dependencies=[allow_editor_or_admin])
+async def get_all_news_for_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all automated news articles (including drafts) for management panel.
+    """
+    query = select(AutomatedNews).order_by(AutomatedNews.published_at.desc())
+    result = await db.execute(query)
+    articles = result.scalars().all()
+    return articles
+
+
 @router.get("/news/{slug}", response_model=AutomatedNewsResponse)
 async def get_news_by_slug(
     slug: str,
@@ -92,6 +105,19 @@ async def get_announcements(
     return announcements
 
 
+@router.get("/announcements/admin", response_model=list[AnnouncementResponse], dependencies=[allow_editor_or_admin])
+async def get_all_announcements_for_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all announcements (including drafts) for management panel.
+    """
+    query = select(Announcement).order_by(Announcement.is_pinned.desc(), Announcement.published_at.desc())
+    result = await db.execute(query)
+    announcements = result.scalars().all()
+    return announcements
+
+
 @router.get("/announcements/{slug}", response_model=AnnouncementResponse)
 async def get_announcement_by_slug(
     slug: str,
@@ -132,6 +158,19 @@ async def get_events(
         
     query = query.order_by(Event.event_date.asc()).limit(limit)
     
+    result = await db.execute(query)
+    events = result.scalars().all()
+    return events
+
+
+@router.get("/events/admin", response_model=list[EventResponse], dependencies=[allow_editor_or_admin])
+async def get_all_events_for_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all events (including drafts) for management panel.
+    """
+    query = select(Event).order_by(Event.event_date.asc())
     result = await db.execute(query)
     events = result.scalars().all()
     return events

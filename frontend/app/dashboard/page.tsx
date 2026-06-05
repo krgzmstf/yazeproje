@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { 
   Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut, 
   User, ShieldCheck, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
-  TrendingUp, Activity, CheckCircle2, Clock, Eye, AlertCircle, Laptop, Mail
+  TrendingUp, Activity, CheckCircle2, Clock, Eye, AlertCircle, Laptop, Mail,
+  FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download, 
+  Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown
 } from "lucide-react";
 
 interface UserProfile {
@@ -33,18 +35,21 @@ export default function DashboardPage() {
   const [news, setNews] = useState<any[]>([]);
   const [software, setSoftware] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
   
   // UX States
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("newest");
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"project" | "listing" | "news" | "software">("project");
+  const [modalType, setModalType] = useState<"project" | "listing" | "news" | "software" | "announcement" | "event">("project");
   const [editId, setEditId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState<any>({});
+  const [quickInfoPoolMode, setQuickInfoPoolMode] = useState<"visual" | "json">("visual");
 
   // Location API states
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -146,25 +151,44 @@ export default function DashboardPage() {
         }
       }
 
-      const resProj = await fetch(`${apiBase}/projects/`);
+      const parsedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+      const isArchitectOrAdmin = parsedUser.role === "admin" || parsedUser.role === "architect";
+      const resProj = await fetch(`${apiBase}/projects${isArchitectOrAdmin ? "/admin" : "/"}`, {
+        headers: isArchitectOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       if (resProj.ok) setProjects(await resProj.json());
 
-      const resList = await fetch(`${apiBase}/listings/`);
+      const isAgentOrAdmin = parsedUser.role === "admin" || parsedUser.role === "agent";
+      const resList = await fetch(`${apiBase}/listings${isAgentOrAdmin ? "/admin" : "/"}`, {
+        headers: isAgentOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       if (resList.ok) setListings(await resList.json());
 
-      const resNews = await fetch(`${apiBase}/news`);
+      const isEditorOrAdmin = parsedUser.role === "admin" || parsedUser.role === "editor";
+      const resNews = await fetch(`${apiBase}/news${isEditorOrAdmin ? "/admin" : ""}`, {
+        headers: isEditorOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
+      });
       if (resNews.ok) setNews(await resNews.json());
 
+      const resAnn = await fetch(`${apiBase}/announcements${isEditorOrAdmin ? "/admin" : ""}`, {
+        headers: isEditorOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
+      });
+      if (resAnn.ok) setAnnouncements(await resAnn.json());
+
+      const resEvt = await fetch(`${apiBase}/events${isEditorOrAdmin ? "/admin" : ""}`, {
+        headers: isEditorOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
+      });
+      if (resEvt.ok) setEvents(await resEvt.json());
+
       // Fetch software products
-      const resSoft = await fetch(`${apiBase}/software/admin`, {
-        headers: {
-          Authorization: `Bearer ${authToken}`
-        }
+      const isDeveloperOrAdmin = parsedUser.role === "admin" || parsedUser.role === "developer";
+      const resSoft = await fetch(`${apiBase}/software${isDeveloperOrAdmin ? "/admin" : ""}`, {
+        headers: isDeveloperOrAdmin ? { Authorization: `Bearer ${authToken}` } : {}
       });
       if (resSoft.ok) setSoftware(await resSoft.json());
 
       // Fetch contact messages
-      const parsedUser = JSON.parse(localStorage.getItem("user") || "{}");
       if (parsedUser.role === "admin" || parsedUser.role === "editor") {
         const resMsg = await fetch(`${apiBase}/contact-messages`, {
           headers: {
@@ -193,6 +217,8 @@ export default function DashboardPage() {
     if (tabName === "projects" && user.role === "architect") return true;
     if (tabName === "listings" && user.role === "agent") return true;
     if (tabName === "news" && user.role === "editor") return true;
+    if (tabName === "announcements" && user.role === "editor") return true;
+    if (tabName === "events" && user.role === "editor") return true;
     if (tabName === "software" && user.role === "developer") return true;
     if (tabName === "messages" && (user.role === "admin" || user.role === "editor")) return true;
     if (tabName === "overview") return true;
@@ -200,7 +226,7 @@ export default function DashboardPage() {
   };
 
   // CRUD Actions
-  const handleDelete = async (type: "projects" | "listings" | "news" | "software" | "contact-messages", id: string) => {
+  const handleDelete = async (type: "projects" | "listings" | "news" | "software" | "contact-messages" | "announcements" | "events", id: string) => {
     if (!window.confirm("Bu öğeyi kalıcı olarak silmek istediğinize emin misiniz?")) return;
 
     try {
@@ -382,8 +408,136 @@ export default function DashboardPage() {
     });
   };
 
+  const updatePoolItem = (index: number, key: string, value: any) => {
+    setSettingsData((prev: any) => {
+      let pool = [];
+      if (typeof prev.quick_info_pool === 'string') {
+        try {
+          pool = JSON.parse(prev.quick_info_pool);
+        } catch (err) {
+          pool = [];
+        }
+      } else if (Array.isArray(prev.quick_info_pool)) {
+        pool = [...prev.quick_info_pool];
+      }
+      
+      while (pool.length <= index) {
+        pool.push({ title: "", desc: "", icon: "HelpCircle", href: "" });
+      }
+      pool[index] = { ...pool[index], [key]: value };
+      return { ...prev, quick_info_pool: pool };
+    });
+  };
 
-  const openAddModal = (type: "project" | "listing" | "news" | "software") => {
+  const addPoolItem = () => {
+    setSettingsData((prev: any) => {
+      let pool = [];
+      if (typeof prev.quick_info_pool === 'string') {
+        try {
+          pool = JSON.parse(prev.quick_info_pool);
+        } catch (err) {
+          pool = [];
+        }
+      } else if (Array.isArray(prev.quick_info_pool)) {
+        pool = [...prev.quick_info_pool];
+      }
+      pool.push({ title: "", desc: "", icon: "HelpCircle", href: "" });
+      return { ...prev, quick_info_pool: pool };
+    });
+  };
+
+  const removePoolItem = (index: number) => {
+    setSettingsData((prev: any) => {
+      let pool = [];
+      if (typeof prev.quick_info_pool === 'string') {
+        try {
+          pool = JSON.parse(prev.quick_info_pool);
+        } catch (err) {
+          pool = [];
+        }
+      } else if (Array.isArray(prev.quick_info_pool)) {
+        pool = [...prev.quick_info_pool];
+      }
+      pool.splice(index, 1);
+      return { ...prev, quick_info_pool: pool };
+    });
+  };
+
+  const movePoolItem = (index: number, direction: 'up' | 'down') => {
+    setSettingsData((prev: any) => {
+      let pool = [];
+      if (typeof prev.quick_info_pool === 'string') {
+        try {
+          pool = JSON.parse(prev.quick_info_pool);
+        } catch (err) {
+          pool = [];
+        }
+      } else if (Array.isArray(prev.quick_info_pool)) {
+        pool = [...prev.quick_info_pool];
+      }
+      
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= pool.length) return prev;
+      
+      const temp = pool[index];
+      pool[index] = pool[targetIndex];
+      pool[targetIndex] = temp;
+      
+      return { ...prev, quick_info_pool: pool };
+    });
+  };
+
+  const handlePoolItemFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, index: number, isImage: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const uploadData = new FormData();
+    uploadData.append("file", file);
+
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const endpoint = isImage ? "/upload/image" : "/upload/file";
+      const res = await fetch(`${apiBase}${endpoint}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: uploadData,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || "Yükleme başarısız.");
+      }
+
+      const data = await res.json();
+      const fileUrl = data.relative_path || data.url;
+      
+      setSettingsData((prev: any) => {
+        let pool = [];
+        if (typeof prev.quick_info_pool === 'string') {
+          try { pool = JSON.parse(prev.quick_info_pool); } catch (err) { pool = []; }
+        } else if (Array.isArray(prev.quick_info_pool)) {
+          pool = [...prev.quick_info_pool];
+        }
+        while (pool.length <= index) {
+          pool.push({ title: "", desc: "", icon: "HelpCircle", href: "" });
+        }
+        pool[index] = { ...pool[index], href: fileUrl };
+        return { ...prev, quick_info_pool: pool };
+      });
+
+      alert("Dosya başarıyla yüklendi.");
+    } catch (err: any) {
+      alert(err.message || "Dosya yüklenirken bir hata oluştu.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+
+  const openAddModal = (type: "project" | "listing" | "news" | "software" | "announcement" | "event") => {
     setModalType(type);
     setEditId(null);
     if (type === "project") {
@@ -460,11 +614,33 @@ export default function DashboardPage() {
         is_featured: false,
         sort_order: 0,
       });
+    } else if (type === "announcement") {
+      setFormData({
+        title: "",
+        content: "",
+        cover_image_url: "",
+        is_published: true,
+        is_pinned: false,
+        published_at: new Date().toISOString().split("T")[0],
+      });
+    } else if (type === "event") {
+      setFormData({
+        title: "",
+        description: "",
+        location: "",
+        event_date: new Date().toISOString().slice(0, 16),
+        event_end_date: new Date().toISOString().slice(0, 16),
+        cover_image_url: "",
+        registration_url: "",
+        is_published: true,
+        is_featured: false,
+        max_attendees: 100,
+      });
     }
     setModalOpen(true);
   };
 
-  const openEditModal = (type: "project" | "listing" | "news" | "software", item: any) => {
+  const openEditModal = (type: "project" | "listing" | "news" | "software" | "announcement" | "event", item: any) => {
     setModalType(type);
     setEditId(item.id);
     if (type === "listing") {
@@ -499,12 +675,17 @@ export default function DashboardPage() {
           ? "listings" 
           : modalType === "news" 
             ? "news" 
-            : "software";
+            : modalType === "software"
+              ? "software"
+              : modalType === "announcement"
+                ? "announcements"
+                : "events";
       const method = editId ? "PUT" : "POST";
       const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+      const hasNoTrailingSlash = path === "news" || path === "announcements" || path === "events";
       const url = editId 
         ? `${apiBase}/${path}/${editId}` 
-        : `${apiBase}/${path}${path === "news" ? "" : "/"}`;
+        : `${apiBase}/${path}${hasNoTrailingSlash ? "" : "/"}`;
 
       const response = await fetch(url, {
         method: method,
@@ -651,9 +832,39 @@ export default function DashboardPage() {
               >
                 <div className="flex items-center space-x-3">
                   <Newspaper className="w-4 h-4" />
-                  <span>Haber & Duyurular</span>
+                  <span>Yerel Haberler</span>
                 </div>
                 <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "news" ? "text-navy-dark" : "text-gold"}`} />
+              </button>
+            )}
+
+            {hasAccess("announcements") && (
+              <button
+                onClick={() => { setActiveTab("announcements"); setSearchQuery(""); }}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                  activeTab === "announcements" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Layers className="w-4 h-4" />
+                  <span>İmar & Askı İlanları</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "announcements" ? "text-navy-dark" : "text-gold"}`} />
+              </button>
+            )}
+
+            {hasAccess("events") && (
+              <button
+                onClick={() => { setActiveTab("events"); setSearchQuery(""); }}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                  activeTab === "events" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Clock className="w-4 h-4" />
+                  <span>Kültürel Etkinlikler</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "events" ? "text-navy-dark" : "text-gold"}`} />
               </button>
             )}
 
@@ -1184,6 +1395,226 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* ── Tab: Announcements (İmar & Askı İlanları) ─────────────────────────── */}
+            {activeTab === "announcements" && (
+              <div className="space-y-6 animate-fade-in-up">
+                
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-5">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">İmar ve Plan Askı İlanları</h2>
+                    <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Belediye İmar Plan Askıları ve Resmi Duyurular</p>
+                  </div>
+                  <button
+                    onClick={() => openAddModal("announcement")}
+                    className="flex items-center space-x-2 bg-gradient-to-r from-gold-dark to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg hover:shadow-gold/15 shrink-0 self-start md:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Yeni Duyuru Ekle</span>
+                  </button>
+                </div>
+
+                {/* Filter / Search Controls */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-navy/60 border border-gold/5 p-4 rounded-xl">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-cream/40" />
+                    <input
+                      type="text"
+                      placeholder="Duyurularda ara..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-9 pr-4 py-2.5 text-xs text-cream outline-none placeholder-cream/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Table List */}
+                <div className="bg-navy border border-gold/10 rounded-xl overflow-hidden shadow-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-navy-dark text-[9px] uppercase font-bold text-gold/70 border-b border-gold/10 tracking-widest">
+                          <th className="p-4 w-12">Önizleme</th>
+                          <th className="p-4">Duyuru Başlığı</th>
+                          <th className="p-4">Tarih</th>
+                          <th className="p-4">Sabit</th>
+                          <th className="p-4">Durum</th>
+                          <th className="p-4 text-right">Eylemler</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gold/5">
+                        {announcements
+                          .filter(a => 
+                            !searchQuery || 
+                            (a.title && a.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (a.content && a.content.toLowerCase().includes(searchQuery.toLowerCase()))
+                          ).map((ann) => (
+                          <tr key={ann.id} className="hover:bg-navy-dark/40 transition-colors">
+                            <td className="p-4">
+                              <div className="w-12 h-12 rounded overflow-hidden bg-navy-dark border border-gold/10 relative">
+                                <img
+                                  src={ann.cover_image_url || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=80&q=80"}
+                                  alt=""
+                                  className="object-cover w-full h-full hover:scale-110 transition-transform duration-300"
+                                />
+                              </div>
+                            </td>
+                            <td className="p-4 font-semibold text-cream line-clamp-2 max-w-sm leading-relaxed">{ann.title}</td>
+                            <td className="p-4 text-cream/70">{ann.published_at || "-"}</td>
+                            <td className="p-4">
+                              {ann.is_pinned ? (
+                                <span className="bg-gold/10 text-gold px-2.5 py-1 rounded font-bold uppercase text-[9px] tracking-wider">Sabitlendi</span>
+                              ) : (
+                                <span className="text-cream/35">-</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center space-x-2">
+                                <span className={`w-2 h-2 rounded-full ${
+                                  ann.is_published ? "bg-green-400" : "bg-red-400"
+                                }`} />
+                                <span className="uppercase text-[9px] font-bold text-cream/80">{ann.is_published ? "Yayında" : "Taslak"}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end space-x-3">
+                                <button
+                                  onClick={() => openEditModal("announcement", ann)}
+                                  className="p-1.5 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold text-cream/60 hover:text-gold rounded transition-all"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete("announcements", ann.id)}
+                                  className="p-1.5 bg-navy-dark hover:bg-red-950/20 border border-gold/10 hover:border-red-500/30 text-cream/60 hover:text-red-400 rounded transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {announcements.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-cream/35 italic">Henüz hiç duyuru bulunmuyor.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Tab: Events (Kültürel Etkinlikler) ─────────────────────────── */}
+            {activeTab === "events" && (
+              <div className="space-y-6 animate-fade-in-up">
+                
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-5">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">Kültürel ve Eğitsel Etkinlikler</h2>
+                    <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Seminerler, Konferanslar ve Sosyal Etkinlik Yönetimi</p>
+                  </div>
+                  <button
+                    onClick={() => openAddModal("event")}
+                    className="flex items-center space-x-2 bg-gradient-to-r from-gold-dark to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-lg hover:shadow-gold/15 shrink-0 self-start md:self-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Yeni Etkinlik Ekle</span>
+                  </button>
+                </div>
+
+                {/* Filter / Search Controls */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-navy/60 border border-gold/5 p-4 rounded-xl">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-cream/40" />
+                    <input
+                      type="text"
+                      placeholder="Etkinliklerde ara..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-9 pr-4 py-2.5 text-xs text-cream outline-none placeholder-cream/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Table List */}
+                <div className="bg-navy border border-gold/10 rounded-xl overflow-hidden shadow-2xl">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-navy-dark text-[9px] uppercase font-bold text-gold/70 border-b border-gold/10 tracking-widest">
+                          <th className="p-4 w-12">Önizleme</th>
+                          <th className="p-4">Etkinlik Adı</th>
+                          <th className="p-4">Tarih</th>
+                          <th className="p-4">Konum</th>
+                          <th className="p-4">Katılımcı Limiti</th>
+                          <th className="p-4">Durum</th>
+                          <th className="p-4 text-right">Eylemler</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gold/5">
+                        {events
+                          .filter(e => 
+                            !searchQuery || 
+                            (e.title && e.title.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (e.location && e.location.toLowerCase().includes(searchQuery.toLowerCase()))
+                          ).map((evt) => (
+                          <tr key={evt.id} className="hover:bg-navy-dark/40 transition-colors">
+                            <td className="p-4">
+                              <div className="w-12 h-12 rounded overflow-hidden bg-navy-dark border border-gold/10 relative">
+                                <img
+                                  src={evt.cover_image_url || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=80&q=80"}
+                                  alt=""
+                                  className="object-cover w-full h-full hover:scale-110 transition-transform duration-300"
+                                />
+                              </div>
+                            </td>
+                            <td className="p-4 font-semibold text-cream line-clamp-2 max-w-xs leading-relaxed">{evt.title}</td>
+                            <td className="p-4 text-cream/70 font-semibold">{evt.event_date ? new Date(evt.event_date).toLocaleString("tr-TR") : "-"}</td>
+                            <td className="p-4 text-cream/60">{evt.location || "-"}</td>
+                            <td className="p-4 text-gold">
+                              {evt.max_attendees ? `${evt.current_attendees} / ${evt.max_attendees}` : "Sınırsız"}
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center space-x-2">
+                                <span className={`w-2 h-2 rounded-full ${
+                                  evt.is_published ? "bg-green-400" : "bg-red-400"
+                                }`} />
+                                <span className="uppercase text-[9px] font-bold text-cream/80">{evt.is_published ? "Yayında" : "Taslak"}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex items-center justify-end space-x-3">
+                                <button
+                                  onClick={() => openEditModal("event", evt)}
+                                  className="p-1.5 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold text-cream/60 hover:text-gold rounded transition-all"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete("events", evt.id)}
+                                  className="p-1.5 bg-navy-dark hover:bg-red-950/20 border border-gold/10 hover:border-red-500/30 text-cream/60 hover:text-red-400 rounded transition-all"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {events.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="p-8 text-center text-cream/35 italic">Henüz hiç etkinlik bulunmuyor.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── Tab: Software (Yazılım Ürünleri) ─────────────────────────── */}
             {activeTab === "software" && (
               <div className="space-y-6 animate-fade-in-up">
@@ -1312,6 +1743,9 @@ export default function DashboardPage() {
                 <div className="flex flex-wrap gap-2 border-b border-gold/10 pb-4">
                   {[
                     { id: "general", label: "Genel Kimlik" },
+                    { id: "header", label: "Ana Menü (Header)" },
+                    { id: "quick_menu", label: "Hızlı Menü" },
+                    { id: "quick_info_pool", label: "Hızlı Bilgi Havuzu" },
                     { id: "hero", label: "Giriş (Hero) Bölümü" },
                     { id: "about", label: "Hakkımızda" },
                     { id: "mission_vision", label: "Misyon & Vizyon" },
@@ -1526,6 +1960,228 @@ export default function DashboardPage() {
                             spellCheck="false"
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {/* QUICK INFO POOL SETTINGS */}
+                    {activeSettingsGroup === "quick_info_pool" && (
+                      <div className="space-y-5">
+                        <div className="flex justify-between items-center border-b border-gold/10 pb-2">
+                          <span className="text-[10px] font-bold text-gold uppercase tracking-wider">Hızlı Bilgi Havuzu Ayarları</span>
+                          <div className="flex bg-navy-dark border border-gold/10 p-0.5 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => setQuickInfoPoolMode("visual")}
+                              className={`px-3 py-1 rounded-md text-[9px] font-bold uppercase transition-all duration-200 ${
+                                quickInfoPoolMode === "visual"
+                                  ? "bg-gold text-navy-dark"
+                                  : "text-cream/55 hover:text-cream"
+                              }`}
+                            >
+                              Görsel Arayüz
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuickInfoPoolMode("json")}
+                              className={`px-3 py-1 rounded-md text-[9px] font-bold uppercase transition-all duration-200 ${
+                                quickInfoPoolMode === "json"
+                                  ? "bg-gold text-navy-dark"
+                                  : "text-cream/55 hover:text-cream"
+                              }`}
+                            >
+                              JSON Kod
+                            </button>
+                          </div>
+                        </div>
+
+                        {quickInfoPoolMode === "json" ? (
+                          <div>
+                            <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2 flex justify-between">
+                              <span>Bilgi Havuzu Öğeleri (JSON)</span>
+                              <span className="text-[8px] text-gold">Geçerli bir JSON dizisi formatında olmalıdır. İkonlar Lucide kütüphanesinden alınır.</span>
+                            </label>
+                            <textarea
+                              value={typeof settingsData.quick_info_pool === 'string' ? settingsData.quick_info_pool : JSON.stringify(settingsData.quick_info_pool || [], null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  setSettingsData({ ...settingsData, quick_info_pool: parsed });
+                                } catch (err) {
+                                  setSettingsData({ ...settingsData, quick_info_pool: e.target.value });
+                                }
+                              }}
+                              className="w-full h-96 bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none font-mono text-[10px]"
+                              spellCheck="false"
+                            />
+                          </div>
+                        ) : (() => {
+                          let pool: any[] = [];
+                          if (typeof settingsData.quick_info_pool === 'string') {
+                            try { pool = JSON.parse(settingsData.quick_info_pool); } catch (err) { pool = []; }
+                          } else if (Array.isArray(settingsData.quick_info_pool)) {
+                            pool = settingsData.quick_info_pool;
+                          }
+
+                          return (
+                            <div className="space-y-4">
+                              <p className="text-[10px] text-cream/50 leading-relaxed font-light">
+                                Mimarlık & Yapı sayfasının sağ tarafında bulunan "Hızlı Bilgi Havuzu" kartlarını buradan ekleyebilir, silebilir, sıralayabilir ve dosyalarını/linklerini güncelleyebilirsiniz.
+                              </p>
+
+                              {pool.length === 0 ? (
+                                <div className="border border-dashed border-gold/15 rounded-xl p-8 text-center text-cream/40">
+                                  Havuzda henüz hiçbir öğe yok. Başlamak için "Yeni Öğe Ekle" butonuna basın.
+                                </div>
+                              ) : (
+                                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                                  {pool.map((item: any, idx: number) => {
+                                    const IconComponent = (() => {
+                                      switch (item.icon) {
+                                        case "FileText": return FileText;
+                                        case "Calculator": return Calculator;
+                                        case "BookOpen": return BookOpen;
+                                        case "Layers": return Layers;
+                                        case "Link": return LinkIcon;
+                                        case "HelpCircle": return HelpCircle;
+                                        case "Info": return Info;
+                                        case "Download": return Download;
+                                        case "Image": return ImageIcon;
+                                        default: return HelpCircle;
+                                      }
+                                    })();
+
+                                    return (
+                                      <div key={idx} className="bg-navy-dark p-4 rounded-xl border border-gold/10 space-y-3 relative group">
+                                        <div className="absolute top-3 right-3 flex items-center space-x-1.5 opacity-65 group-hover:opacity-100 transition-opacity">
+                                          <button
+                                            type="button"
+                                            onClick={() => movePoolItem(idx, "up")}
+                                            disabled={idx === 0}
+                                            className="p-1 hover:bg-gold/15 text-gold rounded-lg disabled:text-cream/20 disabled:hover:bg-transparent"
+                                            title="Yukarı Taşı"
+                                          >
+                                            <ArrowUp className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => movePoolItem(idx, "down")}
+                                            disabled={idx === pool.length - 1}
+                                            className="p-1 hover:bg-gold/15 text-gold rounded-lg disabled:text-cream/20 disabled:hover:bg-transparent"
+                                            title="Aşağı Taşı"
+                                          >
+                                            <ArrowDown className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => removePoolItem(idx)}
+                                            className="p-1 hover:bg-red-500/15 text-red-400 hover:text-red-300 rounded-lg"
+                                            title="Sil"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pr-24">
+                                          <div className="md:col-span-8">
+                                            <label className="block text-[8px] uppercase font-bold text-cream/55 mb-1">Başlık (Link Adı)</label>
+                                            <input
+                                              type="text"
+                                              value={item.title || ""}
+                                              onChange={(e) => updatePoolItem(idx, "title", e.target.value)}
+                                              className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-2.5 py-1.5 text-cream outline-none text-[10px]"
+                                              placeholder="örn: İnşaat Ruhsatı Rehberi"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-4">
+                                            <label className="block text-[8px] uppercase font-bold text-cream/55 mb-1">İkon</label>
+                                            <div className="flex items-center space-x-2">
+                                              <div className="w-8 h-8 rounded-lg bg-gold/10 text-gold flex items-center justify-center shrink-0">
+                                                <IconComponent className="w-4 h-4" />
+                                              </div>
+                                              <select
+                                                value={item.icon || "HelpCircle"}
+                                                onChange={(e) => updatePoolItem(idx, "icon", e.target.value)}
+                                                className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-2.5 py-1.5 text-cream outline-none text-[10px] font-mono"
+                                              >
+                                                <option value="FileText">Doküman (FileText)</option>
+                                                <option value="Calculator">Hesap (Calculator)</option>
+                                                <option value="BookOpen">Rehber (BookOpen)</option>
+                                                <option value="Layers">İmar (Layers)</option>
+                                                <option value="Link">Bağlantı (Link)</option>
+                                                <option value="Download">İndirme (Download)</option>
+                                                <option value="Image">Görsel (Image)</option>
+                                                <option value="Info">Bilgi (Info)</option>
+                                                <option value="HelpCircle">Yardım (HelpCircle)</option>
+                                              </select>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div>
+                                          <label className="block text-[8px] uppercase font-bold text-cream/55 mb-1">Kısa Açıklama</label>
+                                          <input
+                                            type="text"
+                                            value={item.desc || ""}
+                                            onChange={(e) => updatePoolItem(idx, "desc", e.target.value)}
+                                            className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-2.5 py-1.5 text-cream outline-none text-[10px]"
+                                            placeholder="örn: Gerekli belgeler ve başvuru süreci detayları."
+                                          />
+                                        </div>
+
+                                        <div className="bg-navy/40 p-3 rounded-lg border border-gold/5 space-y-2">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[8px] uppercase font-bold text-cream/55">Bağlantı Tipi & Adresi</span>
+                                            <span className="text-[8px] text-gold/60">Ekleyeceğiniz link PDF, DOC, JPEG vb. bir dosya ise yükleyin.</span>
+                                          </div>
+                                          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                            <div className="md:col-span-8">
+                                              <input
+                                                type="text"
+                                                value={item.href || ""}
+                                                onChange={(e) => updatePoolItem(idx, "href", e.target.value)}
+                                                className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-2.5 py-1.5 text-cream outline-none text-[10px] font-mono"
+                                                placeholder="Harici URL (örn: https://...) veya dosya yolu"
+                                              />
+                                            </div>
+                                            <div className="md:col-span-4">
+                                              <label className="flex items-center justify-center w-full px-3 py-1.5 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg cursor-pointer font-bold transition-all text-[10px] select-none text-center">
+                                                {uploading ? "Yükleniyor..." : "Dosya / Belge Yükle"}
+                                                <input
+                                                  type="file"
+                                                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                                  disabled={uploading}
+                                                  onChange={(e) => handlePoolItemFileUpload(e, idx)}
+                                                  className="hidden"
+                                                />
+                                              </label>
+                                            </div>
+                                          </div>
+                                          {item.href && (
+                                            <div className="flex items-center space-x-1.5 text-[8px] text-gold">
+                                              <span>Mevcut Dosya/Bağlantı:</span>
+                                              <a href={item.href.startsWith("http") ? item.href : `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1"}${item.href}`} target="_blank" rel="noopener noreferrer" className="underline hover:text-gold-light truncate max-w-md">
+                                                {item.href}
+                                              </a>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={addPoolItem}
+                                className="w-full py-2.5 bg-gold/5 hover:bg-gold/15 text-gold border border-dashed border-gold/25 rounded-xl font-bold transition-all text-[10px] flex items-center justify-center space-x-2"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Yeni Bilgi Havuzu Öğesi Ekle</span>
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -2037,7 +2693,7 @@ export default function DashboardPage() {
               <div className="flex items-center space-x-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-gold" />
                 <h3 className="font-playfair text-sm md:text-base font-bold text-gold">
-                  {editId ? "Öğeyi Düzenle" : "Yeni İçerik Oluştur"} &rarr; {modalType === "project" ? "Mimarlık Projesi" : modalType === "listing" ? "Emlak İlanı" : modalType === "news" ? "Yerel Haber" : "Yazılım Ürünü"}
+                  {editId ? "Öğeyi Düzenle" : "Yeni İçerik Oluştur"} &rarr; {modalType === "project" ? "Mimarlık Projesi" : modalType === "listing" ? "Emlak İlanı" : modalType === "news" ? "Yerel Haber" : modalType === "software" ? "Yazılım Ürünü" : modalType === "announcement" ? "Plan/İmar Askı İlanı" : "Kültürel Etkinlik"}
                 </h3>
               </div>
               <button 
@@ -2347,6 +3003,120 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* ANNOUNCEMENT FORM FIELDS */}
+              {modalType === "announcement" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-navy-dark/45 p-5 rounded-xl border border-gold/5">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Yayınlanma Tarihi</label>
+                    <input
+                      type="date"
+                      value={formData.published_at || ""}
+                      onChange={(e) => setFormData({ ...formData, published_at: e.target.value })}
+                      className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-6 mt-4">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="ann_is_published"
+                        checked={formData.is_published || false}
+                        onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
+                        className="w-4 h-4 rounded border-gold/20 text-gold bg-navy-dark"
+                      />
+                      <label htmlFor="ann_is_published" className="text-[10px] font-bold text-cream/65 uppercase tracking-wider select-none cursor-pointer">Yayında</label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="checkbox"
+                        id="ann_is_pinned"
+                        checked={formData.is_pinned || false}
+                        onChange={(e) => setFormData({ ...formData, is_pinned: e.target.checked })}
+                        className="w-4 h-4 rounded border-gold/20 text-gold bg-navy-dark"
+                      />
+                      <label htmlFor="ann_is_pinned" className="text-[10px] font-bold text-cream/65 uppercase tracking-wider select-none cursor-pointer">Üste Sabitle</label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* EVENT FORM FIELDS */}
+              {modalType === "event" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-navy-dark/45 p-5 rounded-xl border border-gold/5">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Etkinlik Başlangıç Tarihi</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.event_date ? formData.event_date.slice(0, 16) : ""}
+                        onChange={(e) => setFormData({ ...formData, event_date: e.target.value })}
+                        className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Etkinlik Bitiş Tarihi</label>
+                      <input
+                        type="datetime-local"
+                        value={formData.event_end_date ? formData.event_end_date.slice(0, 16) : ""}
+                        onChange={(e) => setFormData({ ...formData, event_end_date: e.target.value })}
+                        className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Etkinlik Konumu</label>
+                      <input
+                        type="text"
+                        value={formData.location || ""}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        placeholder="Örn: YAZE Kültür Merkezi"
+                        className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Kayıt URL (Opsiyonel)</label>
+                      <input
+                        type="text"
+                        value={formData.registration_url || ""}
+                        onChange={(e) => setFormData({ ...formData, registration_url: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Maksimum Katılımcı</label>
+                      <input
+                        type="number"
+                        value={formData.max_attendees || 0}
+                        onChange={(e) => setFormData({ ...formData, max_attendees: parseInt(e.target.value) })}
+                        className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-6 mt-4">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          id="evt_is_published"
+                          checked={formData.is_published || false}
+                          onChange={(e) => setFormData({ ...formData, is_published: e.target.checked })}
+                          className="w-4 h-4 rounded border-gold/20 text-gold bg-navy-dark"
+                        />
+                        <label htmlFor="evt_is_published" className="text-[10px] font-bold text-cream/65 uppercase tracking-wider select-none cursor-pointer">Yayında</label>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          id="evt_is_featured"
+                          checked={formData.is_featured || false}
+                          onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                          className="w-4 h-4 rounded border-gold/20 text-gold bg-navy-dark"
+                        />
+                        <label htmlFor="evt_is_featured" className="text-[10px] font-bold text-cream/65 uppercase tracking-wider select-none cursor-pointer">Öne Çıkar</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* NEWS FORM FIELDS */}
               {modalType === "news" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-navy-dark/45 p-5 rounded-xl border border-gold/5">
@@ -2497,13 +3267,25 @@ export default function DashboardPage() {
               )}
 
               {/* Description & Rich Areas */}
-              {modalType !== "news" ? (
+              {modalType !== "news" && modalType !== "announcement" ? (
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Detaylı Açıklama</label>
+                  <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">
+                    {modalType === "event" ? "Etkinlik Detaylı Açıklaması" : "Detaylı Açıklama"}
+                  </label>
                   <textarea
                     rows={4}
                     value={formData.description || ""}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-3 text-cream outline-none resize-none"
+                  />
+                </div>
+              ) : modalType === "announcement" ? (
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Duyuru İçeriği</label>
+                  <textarea
+                    rows={6}
+                    value={formData.content || ""}
+                    onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-3 text-cream outline-none resize-none"
                   />
                 </div>

@@ -1,8 +1,9 @@
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, Eye, Filter, FileText, Calculator, BookOpen, Layers, HelpCircle } from "lucide-react";
-import { getProjects, ProjectCategory, ArchitectureProject } from "@/lib/api";
+import { MapPin, Eye, Filter } from "lucide-react";
+import * as LucideIcons from "lucide-react";
+import { getProjects, ProjectCategory, ArchitectureProject, getSiteSettings } from "@/lib/api";
 
 const categoryLabels: Record<string, string> = {
   all: "Tüm Projeler",
@@ -28,61 +29,61 @@ const sidebarLinks = [
   {
     title: "İnşaat Ruhsatı Nasıl Alınır?",
     desc: "Adım adım ruhsat alma süreci ve gerekli belgeler rehberi.",
-    icon: FileText,
+    icon: "FileText",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Yapı Denetim Harç Hesaplama",
     desc: "Yapı denetim hizmet bedellerini online hesaplayın.",
-    icon: Calculator,
+    icon: "Calculator",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Tip İmar Yönetmeliği",
     desc: "Planlı Alanlar İmar Yönetmeliği güncel mevzuat dokümanı.",
-    icon: BookOpen,
+    icon: "BookOpen",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Büyükşehir İmar Yönetmeliği",
     desc: "Ankara Büyükşehir Belediyesi İmar Yönetmeliği maddeleri.",
-    icon: Layers,
+    icon: "Layers",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Kot Kesit Belgesi Başvurusu",
     desc: "Kot kesit ve vaziyet planı başvuru süreci detayları.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Aplikasyon Krokisi Temini",
     desc: "Lisanslı Harita Kadastro Mühendislik Büroları (LIHKAB) işlemleri.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Yapı Kullanma İzin Belgesi",
     desc: "İskan ruhsatı başvuru koşulları ve onay aşamaları.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Sürdürülebilir Yapı Kriterleri",
     desc: "Yeşil bina sertifikasyon süreçleri ve enerji kimliği.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Şantiye Şefliği Yükümlülükleri",
     desc: "Yönetmeliklere göre şantiye şefliği yasal sorumlulukları.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   },
   {
     title: "Zemin Etüdü ve Raporlama",
     desc: "Geoteknik zemin etüdü raporu hazırlama adımları.",
-    icon: HelpCircle,
+    icon: "HelpCircle",
     href: "/contact?subject=mimarlik"
   }
 ];
@@ -97,6 +98,7 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   let projects: ArchitectureProject[] = [];
   let errorMsg = "";
+  let settings: Record<string, any> = {};
 
   try {
     projects = await getProjects({
@@ -105,6 +107,12 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
   } catch (error) {
     console.error("Failed to fetch projects on server side:", error);
     errorMsg = "Projeler yüklenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyin.";
+  }
+
+  try {
+    settings = await getSiteSettings();
+  } catch (error) {
+    console.error("Failed to fetch settings on server side:", error);
   }
 
   // Active category list for rendering filter buttons
@@ -258,12 +266,16 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
             </div>
             
             <div className="flex flex-col gap-3">
-              {sidebarLinks.map((item, idx) => {
-                const Icon = item.icon;
+              {(settings.quick_info_pool && settings.quick_info_pool.length > 0
+                ? settings.quick_info_pool
+                : sidebarLinks
+              ).map((item: any, idx: number) => {
+                const IconName = item.icon || "HelpCircle";
+                const Icon = (LucideIcons as any)[IconName] || LucideIcons.HelpCircle;
                 return (
                   <Link
                     key={idx}
-                    href={item.href}
+                    href={item.href || "#"}
                     className="group flex items-start space-x-3 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold p-4 rounded-xl transition-all duration-300 shadow-md hover:-translate-y-0.5"
                   >
                     <div className="p-2 bg-gold/10 group-hover:bg-gold text-gold group-hover:text-navy-dark rounded-lg transition-colors shrink-0">

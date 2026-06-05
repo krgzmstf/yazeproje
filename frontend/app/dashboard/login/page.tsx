@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, ArrowRight, ShieldAlert, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Lock, Mail, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -103,14 +105,30 @@ export default function LoginPage() {
             <div className="relative">
               <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors duration-200"
+                className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-10 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors duration-200"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-3.5 text-cream/45 hover:text-gold transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[10px] font-bold">
+            <Link href="/dashboard/forgot-password" className="text-gold hover:text-gold-light transition-colors">
+              Şifremi Unuttum
+            </Link>
+            <Link href="/dashboard/register" className="text-cream/50 hover:text-cream transition-colors">
+              Yeni Hesap Oluştur
+            </Link>
           </div>
 
           <button
@@ -125,7 +143,7 @@ export default function LoginPage() {
 
         {/* Sub Info */}
         <div className="text-center mt-6 text-[10px] text-cream/40">
-          Giriş bilgileri için sistem yöneticinizle iletişime geçin.
+          YAZE Proje Yönetim Paneli
         </div>
       </div>
     </div>

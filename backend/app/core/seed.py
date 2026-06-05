@@ -95,9 +95,17 @@ async def seed_database(session: AsyncSession) -> None:
     # ── 0. USERS ─────────────────────────────────────────────────────
     users = [
         User(
-            email="admin@yazeproje.com",
-            password_hash=hash_password("admin123"),
-            full_name="Yazılım Yönetici",
+            email="krgzmstf@gmail.com",
+            password_hash=hash_password("Ezam_231109"),
+            full_name="Mustafa Karagöz",
+            role=UserRole.ADMIN,
+            is_active=True,
+            is_verified=True,
+        ),
+        User(
+            email="yazeproje@gmail.com",
+            password_hash=hash_password("Ercan_2801"),
+            full_name="Ercan G.",
             role=UserRole.ADMIN,
             is_active=True,
             is_verified=True,

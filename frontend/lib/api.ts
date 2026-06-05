@@ -514,3 +514,30 @@ export async function deleteContactMessage(id: string, token: string): Promise<{
 }
 
 
+export async function registerUser(payload: any): Promise<any> {
+  return apiFetch<any>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+}
+
+
+export async function forgotPassword(email: string): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    cache: "no-store",
+  });
+}
+
+
+export async function resetPassword(token: string, password: string): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+    cache: "no-store",
+  });
+}
+
+

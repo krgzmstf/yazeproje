@@ -52,13 +52,13 @@ const defaultNavItems: NavItem[] = [
     ],
   },
   {
-    name: "Yazılım Vitrini",
+    name: "Yazılım",
     href: "/software",
     desc: "Emlak piyasası için anlık ilan toplama robotları ve imar takip robotları ile sektöre dijital ve akıllı çözümler üretiyoruz.",
     image: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80",
     dropdown: [
-      { name: "YazeSYM", href: "https://yazeproje.com/yazesym" },
-      { name: "yaze_metraj (Metraj Robotu)", href: "/software#yaze-metraj" },
+      { name: "YazeSYM", href: "https://yazesym.yazeproje.com" },
+      { name: "yaze_metraj (Metraj Robotu)", href: "https://metraj.yazeproje.com" },
       { name: "Hazır Yazılım Ürünleri", href: "/software" }
     ],
   },

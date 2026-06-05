@@ -39,6 +39,19 @@ async def get_projects(
     return projects
 
 
+@router.get("/admin", response_model=list[ArchitectureProjectResponse], dependencies=[allow_architect_or_admin])
+async def get_all_projects_for_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all architecture projects (including drafts) for management panel.
+    """
+    query = select(ArchitectureProject).order_by(ArchitectureProject.sort_order.asc(), ArchitectureProject.created_at.desc())
+    result = await db.execute(query)
+    projects = result.scalars().all()
+    return projects
+
+
 @router.get("/{slug}", response_model=ArchitectureProjectResponse)
 async def get_project_by_slug(
     slug: str,

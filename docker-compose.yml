@@ -94,6 +94,7 @@ services:
     environment:
       NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://localhost:1002/api/v1
+      API_URL: http://backend:1002/api/v1
     depends_on:
       - backend
     networks:

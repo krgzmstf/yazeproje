@@ -41,3 +41,12 @@ class Token(BaseModel):
 class TokenPayload(BaseModel):
     sub: str | None = None
     role: str | None = None
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str

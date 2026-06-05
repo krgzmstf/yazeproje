@@ -60,6 +60,19 @@ async def get_listings(
     return listings
 
 
+@router.get("/admin", response_model=list[RealEstateListingResponse], dependencies=[allow_agent_or_admin])
+async def get_all_listings_for_admin(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all real estate listings (including drafts) for management panel.
+    """
+    query = select(RealEstateListing).order_by(RealEstateListing.created_at.desc())
+    result = await db.execute(query)
+    listings = result.scalars().all()
+    return listings
+
+
 @router.get("/{slug}", response_model=RealEstateListingResponse)
 async def get_listing_by_slug(
     slug: str,
