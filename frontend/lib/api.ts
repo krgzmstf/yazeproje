@@ -527,6 +527,21 @@ export async function registerUser(payload: any): Promise<any> {
 }
 
 
+export async function updateProfile(payload: any, token: string): Promise<any> {
+  return apiFetch<any>("/auth/me", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
+
+
 export async function forgotPassword(email: string): Promise<{ status: string; message: string }> {
   return apiFetch<{ status: string; message: string }>("/auth/forgot-password", {
     method: "POST",

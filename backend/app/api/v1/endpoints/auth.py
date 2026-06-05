@@ -6,11 +6,12 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import decode_token, create_access_token, verify_password, hash_password
 from app.models.user import User, UserRole
-from app.schemas.user import UserLogin, Token, UserResponse, UserCreate, ForgotPasswordRequest, ResetPasswordRequest
+from app.schemas.user import UserLogin, Token, UserResponse, UserCreate, ForgotPasswordRequest, ResetPasswordRequest, UserProfileUpdate
 from app.core.email import send_email
 
 router = APIRouter()
 security_scheme = HTTPBearer()
+
 
 
 # ── Dependency: Get Current User ──────────────────────────────────────
@@ -118,6 +119,42 @@ async def get_me(current_user: User = Depends(get_current_user)):
     Get current logged in user details.
     """
     return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_profile(
+    payload: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update the current logged in user details (name, email, phone, password).
+    """
+    # Check if email is changing and is already in use
+    if payload.email.lower() != current_user.email.lower():
+        result = await db.execute(select(User).where(User.email == payload.email))
+        if result.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var.",
+            )
+        current_user.email = payload.email.lower()
+
+    current_user.full_name = payload.full_name
+    current_user.phone = payload.phone
+    
+    if payload.password:
+        if len(payload.password) < 6:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Şifre en az 6 karakter olmalıdır.",
+            )
+        current_user.password_hash = hash_password(payload.password)
+        
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
 
 
 @router.post("/register", response_model=UserResponse)

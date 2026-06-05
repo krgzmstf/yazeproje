@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { 
   Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut, 
   User, ShieldCheck, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
-  TrendingUp, Activity, CheckCircle2, Clock, Eye, AlertCircle, Laptop, Mail,
+  TrendingUp, Activity, CheckCircle2, Clock, Eye, EyeOff, Phone, Lock, AlertCircle, Laptop, Mail,
   FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download, 
   Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown
 } from "lucide-react";
+
+
 
 interface UserProfile {
   email: string;
@@ -59,6 +61,19 @@ export default function DashboardPage() {
   // Form states
   const [formData, setFormData] = useState<any>({});
   const [quickInfoPoolMode, setQuickInfoPoolMode] = useState<"visual" | "json">("visual");
+
+  // Profile settings states
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profilePassword, setProfilePassword] = useState("");
+  const [profileConfirmPassword, setProfileConfirmPassword] = useState("");
+  const [showProfilePassword, setShowProfilePassword] = useState(false);
+  const [showProfileConfirmPassword, setShowProfileConfirmPassword] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileSuccess, setProfileSuccess] = useState("");
+  const [profileSubmitting, setProfileSubmitting] = useState(false);
+
 
   // Location API states
   const [provinces, setProvinces] = useState<any[]>([]);
@@ -133,10 +148,15 @@ export default function DashboardPage() {
       router.push("/dashboard/login");
     } else {
       setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+      const parsed = JSON.parse(savedUser);
+      setUser(parsed);
+      setProfileName(parsed.full_name || "");
+      setProfileEmail(parsed.email || "");
+      setProfilePhone(parsed.phone || "");
       fetchData(savedToken);
     }
   }, [router]);
+
 
   const fetchData = async (authToken: string) => {
     setLoading(true);
@@ -158,9 +178,17 @@ export default function DashboardPage() {
           router.push("/dashboard/login");
           return;
         }
+      } else {
+        const freshUser = await resMe.json();
+        localStorage.setItem("user", JSON.stringify(freshUser));
+        setUser(freshUser);
+        setProfileName(freshUser.full_name || "");
+        setProfileEmail(freshUser.email || "");
+        setProfilePhone(freshUser.phone || "");
       }
 
       const parsedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
 
       const isArchitectOrAdmin = parsedUser.role === "admin" || parsedUser.role === "architect";
       const resProj = await fetch(`${apiBase}/projects${isArchitectOrAdmin ? "/admin" : "/"}`, {
@@ -219,6 +247,73 @@ export default function DashboardPage() {
     window.dispatchEvent(new Event("storage"));
     router.push("/dashboard/login");
   };
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError("");
+    setProfileSuccess("");
+
+    if (profilePassword && profilePassword.length < 6) {
+      setProfileError("Şifre en az 6 karakter olmalıdır.");
+      return;
+    }
+
+    if (profilePassword !== profileConfirmPassword) {
+      setProfileError("Şifreler uyuşmuyor.");
+      return;
+    }
+
+    setProfileSubmitting(true);
+    try {
+      const apiBase = getApiBaseUrl();
+      const payload: any = {
+        full_name: profileName,
+        email: profileEmail,
+        phone: profilePhone || null,
+      };
+      if (profilePassword) {
+        payload.password = profilePassword;
+      }
+
+      const res = await fetch(`${apiBase}/auth/me`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || "Profil güncellenemedi.");
+      }
+
+      const updatedUser = await res.json();
+      
+      const emailChanged = profileEmail.toLowerCase() !== user?.email.toLowerCase();
+      const passwordChanged = !!profilePassword;
+
+      if (emailChanged || passwordChanged) {
+        setProfileSuccess("Profil bilgileriniz güncellendi. Güvenlik nedeniyle oturumunuz kapatılıyor, lütfen tekrar giriş yapın...");
+        setTimeout(() => {
+          handleLogout();
+        }, 3000);
+      } else {
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setProfileSuccess("Profil bilgileriniz başarıyla güncellendi.");
+        setProfilePassword("");
+        setProfileConfirmPassword("");
+        window.dispatchEvent(new Event("storage"));
+      }
+    } catch (err: any) {
+      setProfileError(err.message || "Bir hata oluştu.");
+    } finally {
+      setProfileSubmitting(false);
+    }
+  };
+
 
   const hasAccess = (tabName: string) => {
     if (!user) return false;
@@ -921,6 +1016,20 @@ export default function DashboardPage() {
                 <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "messages" ? "text-navy-dark" : "text-gold"}`} />
               </button>
             )}
+
+            <button
+              onClick={() => { setActiveTab("profile"); setSearchQuery(""); }}
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                activeTab === "profile" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <User className="w-4 h-4" />
+                <span>Profil Ayarları</span>
+              </div>
+              <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "profile" ? "text-navy-dark" : "text-gold"}`} />
+            </button>
+
           </nav>
         </div>
 
@@ -2688,7 +2797,156 @@ export default function DashboardPage() {
                 </div>
               </div>
             )}
+
+            {activeTab === "profile" && (
+              <div className="space-y-6 animate-fade-in-up">
+                {/* Header */}
+                <div className="border-b border-gold/10 pb-5">
+                  <h2 className="font-playfair text-2xl font-bold text-cream">Profil Ayarları</h2>
+                  <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Kişisel bilgilerinizi ve şifrenizi güncelleyin</p>
+                </div>
+
+                {/* Form Wrapper */}
+                <div className="max-w-2xl bg-navy border border-gold/10 rounded-xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-gold/5 rounded-full blur-2xl pointer-events-none" />
+
+                  {profileError && (
+                    <div className="flex items-center space-x-2 bg-red-950/40 border border-red-500/20 text-red-200 text-xs px-4 py-3 rounded-lg mb-6">
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                      <span>{profileError}</span>
+                    </div>
+                  )}
+
+                  {profileSuccess && (
+                    <div className="flex items-center space-x-2 bg-green-950/40 border border-green-500/20 text-green-200 text-xs px-4 py-3 rounded-lg mb-6">
+                      <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                      <span>{profileSuccess}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleProfileUpdate} className="space-y-5">
+                    {/* Full Name */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Ad Soyad</label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
+                        <input
+                          type="text"
+                          required
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          placeholder="Mustafa Karagöz"
+                          className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">E-posta Adresi</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
+                        <input
+                          type="email"
+                          required
+                          value={profileEmail}
+                          onChange={(e) => setProfileEmail(e.target.value)}
+                          placeholder="ornek@yazeproje.com"
+                          className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors"
+                        />
+                      </div>
+                      <p className="text-[9px] text-cream/40 mt-1">E-posta adresinizi değiştirirseniz oturumunuz kapatılacaktır.</p>
+                    </div>
+
+                    {/* Phone */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Telefon Numarası</label>
+                      <div className="relative">
+                        <Phone className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
+                        <input
+                          type="tel"
+                          value={profilePhone}
+                          onChange={(e) => setProfilePhone(e.target.value)}
+                          placeholder="0532..."
+                          className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-4 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Fields Info */}
+                    <div className="border-t border-gold/10 pt-5 mt-5">
+                      <h3 className="text-xs font-bold text-gold mb-1">Şifre Değiştir</h3>
+                      <p className="text-[9px] text-cream/50 mb-4">Şifrenizi güncellemek istemiyorsanız aşağıdaki alanları boş bırakabilirsiniz.</p>
+                    </div>
+
+                    {/* Password */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Yeni Şifre</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
+                        <input
+                          type={showProfilePassword ? "text" : "password"}
+                          value={profilePassword}
+                          onChange={(e) => setProfilePassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-10 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowProfilePassword(!showProfilePassword)}
+                          className="absolute right-3.5 top-3.5 text-cream/45 hover:text-gold transition-colors focus:outline-none"
+                        >
+                          {showProfilePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Yeni Şifre Tekrar</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-cream/40" />
+                        <input
+                          type={showProfileConfirmPassword ? "text" : "password"}
+                          value={profileConfirmPassword}
+                          onChange={(e) => setProfileConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-10 py-3 text-xs text-cream outline-none placeholder-cream/35 transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowProfileConfirmPassword(!showProfileConfirmPassword)}
+                          className="absolute right-3.5 top-3.5 text-cream/45 hover:text-gold transition-colors focus:outline-none"
+                        >
+                          {showProfileConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <div className="flex justify-end pt-4">
+                      <button
+                        type="submit"
+                        disabled={profileSubmitting}
+                        className="px-8 py-3 bg-gradient-to-r from-gold-dark via-gold to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark font-bold text-xs rounded-lg transition-all shadow-lg hover:shadow-gold/15 active:scale-98 disabled:opacity-50 flex items-center space-x-2"
+                      >
+                        {profileSubmitting ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Güncelleniyor...</span>
+                          </>
+                        ) : (
+                          <span>Profil Bilgilerini Kaydet</span>
+                        )}
+                      </button>
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            )}
           </>
+
         )}
       </main>
 

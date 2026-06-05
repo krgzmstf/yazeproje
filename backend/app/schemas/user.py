@@ -50,3 +50,11 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     password: str
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str
+    email: str
+    phone: str | None = None
+    password: str | None = None
+
