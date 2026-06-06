@@ -627,4 +627,21 @@ export async function deleteUser(userId: string, token: string): Promise<{ messa
   });
 }
 
+export async function adminUpdateUser(
+  userId: string,
+  payload: { full_name: string; email: string; phone: string | null; password?: string | null },
+  token: string
+): Promise<any> {
+  return apiFetch<any>(`/auth/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
 

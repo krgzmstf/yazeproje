@@ -11,7 +11,7 @@ import {
   Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown
 } from "lucide-react";
 import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
-import { getUsers, updateUserRole, updateUserStatus, deleteUser } from "@/lib/api";
+import { getUsers, updateUserRole, updateUserStatus, deleteUser, adminUpdateUser } from "@/lib/api";
 
 
 
@@ -89,6 +89,20 @@ export default function DashboardPage() {
   const [updatingUserRoleMap, setUpdatingUserRoleMap] = useState<Record<string, boolean>>({});
   const [updatingUserStatusMap, setUpdatingUserStatusMap] = useState<Record<string, boolean>>({});
 
+  // User Edit Modal States
+  const [editUserModalUser, setEditUserModalUser] = useState<any | null>(null);
+  const [editUserFormName, setEditUserFormName] = useState("");
+  const [editUserFormEmail, setEditUserFormEmail] = useState("");
+  const [editUserFormPhone, setEditUserFormPhone] = useState("");
+  const [editUserFormPassword, setEditUserFormPassword] = useState("");
+  const [editUserFormPasswordConfirm, setEditUserFormPasswordConfirm] = useState("");
+  const [showEditUserPassword, setShowEditUserPassword] = useState(false);
+  const [showEditUserPasswordConfirm, setShowEditUserPasswordConfirm] = useState(false);
+  const [editUserFormError, setEditUserFormError] = useState("");
+  const [editUserFormSuccess, setEditUserFormSuccess] = useState("");
+  const [editUserFormSubmitting, setEditUserFormSubmitting] = useState(false);
+  const [isEditUserPasswordValid, setIsEditUserPasswordValid] = useState(false);
+
   const fetchUsersList = async (authToken: string) => {
     setUsersLoading(true);
     setUsersError("");
@@ -163,6 +177,64 @@ export default function DashboardPage() {
       setDeleteInputVerify("");
     } catch (err: any) {
       alert(err.message || "Kullanıcı silinirken bir hata oluştu.");
+    }
+  };
+
+  const openEditUserModal = (targetUser: any) => {
+    setEditUserModalUser(targetUser);
+    setEditUserFormName(targetUser.full_name || "");
+    setEditUserFormEmail(targetUser.email || "");
+    setEditUserFormPhone(targetUser.phone || "");
+    setEditUserFormPassword("");
+    setEditUserFormPasswordConfirm("");
+    setEditUserFormError("");
+    setEditUserFormSuccess("");
+    setEditUserFormSubmitting(false);
+  };
+
+  const handleEditUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !editUserModalUser) return;
+    setEditUserFormError("");
+    setEditUserFormSuccess("");
+
+    if (editUserFormPassword) {
+      if (!isEditUserPasswordValid) {
+        setEditUserFormError("Yeni şifre yeterince güçlü değil veya kuralları karşılamıyor.");
+        return;
+      }
+      if (editUserFormPassword !== editUserFormPasswordConfirm) {
+        setEditUserFormError("Şifreler uyuşmuyor.");
+        return;
+      }
+    }
+
+    setEditUserFormSubmitting(true);
+    try {
+      const payload: any = {
+        full_name: editUserFormName,
+        email: editUserFormEmail,
+        phone: editUserFormPhone || null,
+      };
+      if (editUserFormPassword) {
+        payload.password = editUserFormPassword;
+      }
+
+      const updated = await adminUpdateUser(editUserModalUser.id, payload, token);
+      
+      // Update local state list
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === editUserModalUser.id ? { ...u, ...updated } : u))
+      );
+
+      setEditUserFormSuccess("Kullanıcı bilgileri başarıyla güncellendi.");
+      setTimeout(() => {
+        setEditUserModalUser(null);
+      }, 1500);
+    } catch (err: any) {
+      setEditUserFormError(err.message || "Kullanıcı güncellenirken bir hata oluştu.");
+    } finally {
+      setEditUserFormSubmitting(false);
     }
   };
 
@@ -3264,20 +3336,32 @@ export default function DashboardPage() {
 
                                   {/* Actions */}
                                   <td className="py-4 px-6 text-right">
-                                    {isSelf ? (
-                                      <span className="text-cream/30 text-[10px] italic">Yönetici</span>
-                                    ) : (
-                                      <button
-                                        onClick={() => {
-                                          setDeleteConfirmUser(u);
-                                          setDeleteInputVerify("");
-                                        }}
-                                        className="inline-flex p-2 bg-red-950/20 hover:bg-red-650/35 border border-red-500/10 hover:border-red-500/30 text-red-400 rounded-lg transition-colors cursor-pointer"
-                                        title="Kullanıcıyı Sil"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
+                                    <div className="flex justify-end items-center space-x-2">
+                                      {isSelf ? (
+                                        <span className="text-cream/30 text-[10px] italic">Yönetici</span>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => openEditUserModal(u)}
+                                            className="inline-flex p-2 bg-gold/10 hover:bg-gold/25 border border-gold/20 hover:border-gold/45 text-gold rounded-lg transition-colors cursor-pointer"
+                                            title="Kullanıcı Bilgilerini Güncelle"
+                                          >
+                                            <Edit className="w-3.5 h-3.5" />
+                                          </button>
+                                          
+                                          <button
+                                            onClick={() => {
+                                              setDeleteConfirmUser(u);
+                                              setDeleteInputVerify("");
+                                            }}
+                                            className="inline-flex p-2 bg-red-950/20 hover:bg-red-650/35 border border-red-500/10 hover:border-red-500/30 text-red-400 rounded-lg transition-colors cursor-pointer"
+                                            title="Kullanıcıyı Sil"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               );
@@ -4028,6 +4112,151 @@ export default function DashboardPage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {editUserModalUser && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4">
+          <div className="bg-navy border border-gold/25 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up">
+            
+            {/* Modal Header */}
+            <div className="bg-navy-dark border-b border-gold/15 p-5 flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <Edit className="w-4 h-4 text-gold" />
+                <h3 className="font-playfair text-sm md:text-base font-bold text-gold">Kullanıcı Bilgilerini Güncelle</h3>
+              </div>
+              <button 
+                onClick={() => setEditUserModalUser(null)}
+                className="text-cream/50 hover:text-cream text-xs focus:outline-none"
+              >
+                Kapat
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleEditUserSubmit} className="p-6 space-y-4 text-xs">
+              
+              {editUserFormError && (
+                <div className="flex items-center space-x-2 bg-red-950/40 border border-red-500/20 text-red-200 text-[11px] px-4 py-3 rounded-lg">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{editUserFormError}</span>
+                </div>
+              )}
+
+              {editUserFormSuccess && (
+                <div className="flex items-center space-x-2 bg-green-950/40 border border-green-500/20 text-green-200 text-[11px] px-4 py-3 rounded-lg">
+                  <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
+                  <span>{editUserFormSuccess}</span>
+                </div>
+              )}
+
+              {/* Name */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-1.5">Ad Soyad</label>
+                <input
+                  type="text"
+                  required
+                  value={editUserFormName}
+                  onChange={(e) => setEditUserFormName(e.target.value)}
+                  className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none placeholder-cream/35 transition-colors"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-1.5">E-posta Adresi</label>
+                <input
+                  type="email"
+                  required
+                  value={editUserFormEmail}
+                  onChange={(e) => setEditUserFormEmail(e.target.value)}
+                  className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none placeholder-cream/35 transition-colors"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-1.5">Telefon Numarası</label>
+                <input
+                  type="tel"
+                  value={editUserFormPhone}
+                  onChange={(e) => setEditUserFormPhone(e.target.value)}
+                  placeholder="0532..."
+                  className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none placeholder-cream/35 transition-colors"
+                />
+              </div>
+
+              {/* Password Info */}
+              <div className="border-t border-gold/10 pt-4 mt-4">
+                <span className="text-[10px] font-bold text-gold uppercase tracking-wider block mb-1">Şifreyi Güncelle (Opsiyonel)</span>
+                <p className="text-[9px] text-cream/40">Şifreyi değiştirmek istemiyorsanız boş bırakabilirsiniz.</p>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-1.5">Yeni Şifre</label>
+                <div className="relative">
+                  <input
+                    type={showEditUserPassword ? "text" : "password"}
+                    value={editUserFormPassword}
+                    onChange={(e) => setEditUserFormPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 pr-10 text-cream outline-none placeholder-cream/35 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditUserPassword(!showEditUserPassword)}
+                    className="absolute right-3.5 top-3.5 text-cream/45 hover:text-gold transition-colors focus:outline-none"
+                  >
+                    {showEditUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {editUserFormPassword && (
+                  <PasswordStrengthMeter password={editUserFormPassword} onValidationChange={setIsEditUserPasswordValid} />
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-1.5">Yeni Şifre Tekrar</label>
+                <div className="relative">
+                  <input
+                    type={showEditUserPasswordConfirm ? "text" : "password"}
+                    value={editUserFormPasswordConfirm}
+                    onChange={(e) => setEditUserFormPasswordConfirm(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 pr-10 text-cream outline-none placeholder-cream/35 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditUserPasswordConfirm(!showEditUserPasswordConfirm)}
+                    className="absolute right-3.5 top-3.5 text-cream/45 hover:text-gold transition-colors focus:outline-none"
+                  >
+                    {showEditUserPasswordConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex space-x-3 pt-4 border-t border-gold/15 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditUserModalUser(null)}
+                  className="px-5 py-2.5 bg-navy-dark hover:bg-navy border border-gold/10 rounded-lg font-bold"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="submit"
+                  disabled={editUserFormSubmitting || (!!editUserFormPassword && !isEditUserPasswordValid)}
+                  className="px-6 py-2.5 bg-gradient-to-r from-gold-dark to-gold hover:from-gold hover:to-gold-dark text-navy-dark rounded-lg font-bold shadow-md disabled:opacity-50"
+                >
+                  {editUserFormSubmitting ? "Güncelleniyor..." : "Değişiklikleri Kaydet"}
+                </button>
+              </div>
+
+            </form>
           </div>
         </div>
       )}

