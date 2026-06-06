@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, User, Phone, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { registerUser, verifyEmail, resendVerificationCode } from "@/lib/api";
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function RegisterPage() {
   const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
   
   // Flow states
   const [step, setStep] = useState<"register" | "verify">("register");
@@ -61,8 +63,8 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Şifre en az 6 karakter olmalıdır.");
+    if (!isPasswordValid) {
+      setError("Şifreniz yeterince güçlü değil veya kuralları karşılamıyor.");
       return;
     }
 
@@ -236,6 +238,7 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <PasswordStrengthMeter password={password} onValidationChange={setIsPasswordValid} />
             </div>
 
             <div>
@@ -262,7 +265,7 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isPasswordValid}
               className="w-full bg-gradient-to-r from-gold-dark via-gold to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark font-bold text-xs py-3.5 rounded-lg flex items-center justify-center space-x-2 transition-all duration-300 shadow-lg hover:shadow-gold/15 active:scale-98 disabled:opacity-50 mt-2"
             >
               <span>{loading ? "Hesap Oluşturuluyor..." : "Kayıt Ol"}</span>

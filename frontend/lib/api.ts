@@ -577,4 +577,54 @@ export async function resendVerificationCode(email: string): Promise<{ status: s
   });
 }
 
+// User Management (Admin only)
+export async function getUsers(token: string): Promise<any[]> {
+  return apiFetch<any[]>("/auth/users", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
+export async function updateUserRole(userId: string, role: string, token: string): Promise<any> {
+  return apiFetch<any>(`/auth/users/${userId}/role`, {
+    method: "PUT",
+    body: JSON.stringify({ role }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
+export async function updateUserStatus(userId: string, isActive: boolean, token: string): Promise<any> {
+  return apiFetch<any>(`/auth/users/${userId}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ is_active: isActive }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
+export async function deleteUser(userId: string, token: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/auth/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+    next: undefined,
+  });
+}
+
 

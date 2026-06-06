@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff } from "lucide-react";
 import { resetPassword } from "@/lib/api";
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -18,6 +19,7 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +36,8 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Şifre en az 6 karakter olmalıdır.");
+    if (!isPasswordValid) {
+      setError("Şifreniz yeterince güçlü değil veya kuralları karşılamıyor.");
       return;
     }
 
@@ -110,6 +112,7 @@ function ResetPasswordForm() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
+          <PasswordStrengthMeter password={password} onValidationChange={setIsPasswordValid} />
         </div>
 
         <div>
@@ -136,7 +139,7 @@ function ResetPasswordForm() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !isPasswordValid}
           className="w-full bg-gradient-to-r from-gold-dark via-gold to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark font-bold text-xs py-3.5 rounded-lg flex items-center justify-center space-x-2 transition-all duration-300 shadow-lg hover:shadow-gold/15 active:scale-98 disabled:opacity-50 mt-2"
         >
           <span>{loading ? "Güncelleniyor..." : "Şifreyi Güncelle"}</span>

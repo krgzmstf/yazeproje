@@ -9,7 +9,7 @@ from app.models.user import User, UserRole
 from app.schemas.user import (
     UserLogin, Token, UserResponse, UserCreate,
     ForgotPasswordRequest, ResetPasswordRequest, UserProfileUpdate,
-    EmailVerifyRequest, ResendVerifyRequest
+    EmailVerifyRequest, ResendVerifyRequest, UserRoleUpdate, UserStatusUpdate
 )
 from app.core.email import send_email
 
@@ -154,17 +154,59 @@ async def update_profile(
     current_user.phone = payload.phone
     
     if payload.password:
-        if len(payload.password) < 6:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Şifre en az 6 karakter olmalıdır.",
-            )
+        validate_password_strength(payload.password)
         current_user.password_hash = hash_password(payload.password)
         
     await db.commit()
     await db.refresh(current_user)
     return current_user
 
+
+
+def validate_password_strength(password: str) -> None:
+    # 1. Length check
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Şifre en az 8 karakter uzunluğunda olmalıdır.",
+        )
+    # 2. Case checks (uppercase & lowercase)
+    import re
+    if not re.search(r"[a-z]", password) or not re.search(r"[A-Z]", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Şifre hem büyük hem küçük harf içermelidir.",
+        )
+    # 3. Digit check
+    if not re.search(r"\d", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Şifre en az bir rakam içermelidir.",
+        )
+    # 4. Special character check
+    if not re.search(r"[!@#$%^&*()_+={}\[\]|\\:;\"'<>,.?/~`-]", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Şifre en az bir özel karakter içermelidir.",
+        )
+    # 5. zxcvbn score check
+    import zxcvbn
+    res = zxcvbn.zxcvbn(password)
+    score = res.get("score", 0)
+    if score < 3:
+        feedback = res.get("feedback", {})
+        warning = feedback.get("warning", "")
+        suggestions = feedback.get("suggestions", [])
+        
+        msg = "Şifreniz tahmin edilebilir/zayıf bulundu. Lütfen daha karmaşık bir şifre seçin."
+        if warning:
+            msg += f" (Uyarı: {warning})"
+        if suggestions:
+            msg += f" Öneriler: {', '.join(suggestions)}"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=msg,
+        )
 
 
 @router.post("/register", response_model=UserResponse)
@@ -175,6 +217,7 @@ async def register(
     """
     Register a new user with default SUBSCRIBER role and send email verification code.
     """
+    validate_password_strength(payload.password)
     import secrets
     from datetime import datetime, timedelta, timezone
 
@@ -307,6 +350,7 @@ async def reset_password(
     """
     Verify reset token and update the user password.
     """
+    validate_password_strength(payload.password)
     try:
         claims = decode_token(payload.token)
         email = claims.get("sub")
@@ -481,3 +525,129 @@ async def resend_verification(
         "status": "success",
         "message": "Doğrulama kodu e-posta adresinize tekrar gönderildi."
     }
+
+
+# ── Admin User Management Endpoints ────────────────────────────────────
+
+@router.get("/users", response_model=list[UserResponse])
+async def list_users(
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List all users in the system. Protected (Admin only).
+    """
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.put("/users/{user_id}/role", response_model=UserResponse)
+async def update_user_role(
+    user_id: str,
+    payload: UserRoleUpdate,
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a user's role. Protected (Admin only).
+    """
+    import uuid
+    try:
+        uuid_id = uuid.UUID(user_id)
+        query = select(User).where(User.id == uuid_id)
+    except ValueError:
+        query = select(User).where(User.id == user_id)
+
+    result = await db.execute(query)
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı."
+        )
+
+    # Prevent admin from changing their own role to prevent lockout
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kendi rolünüzü değiştiremezsiniz."
+        )
+
+    user.role = payload.role
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.put("/users/{user_id}/status", response_model=UserResponse)
+async def update_user_status(
+    user_id: str,
+    payload: UserStatusUpdate,
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a user's active status. Protected (Admin only).
+    """
+    import uuid
+    try:
+        uuid_id = uuid.UUID(user_id)
+        query = select(User).where(User.id == uuid_id)
+    except ValueError:
+        query = select(User).where(User.id == user_id)
+
+    result = await db.execute(query)
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı."
+        )
+
+    # Prevent admin from suspending themselves
+    if user.id == current_user.id and not payload.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kendi hesabınızı askıya alamazsınız."
+        )
+
+    user.is_active = payload.is_active
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    current_user: User = Depends(RoleChecker([UserRole.ADMIN])),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a user from the system. Protected (Admin only).
+    """
+    import uuid
+    try:
+        uuid_id = uuid.UUID(user_id)
+        query = select(User).where(User.id == uuid_id)
+    except ValueError:
+        query = select(User).where(User.id == user_id)
+
+    result = await db.execute(query)
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kullanıcı bulunamadı."
+        )
+
+    # Prevent admin from deleting themselves
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kendi hesabınızı silemezsiniz."
+        )
+
+    await db.delete(user)
+    await db.commit()
+    return {"message": "Kullanıcı başarıyla silindi."}

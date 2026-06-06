@@ -5,15 +5,18 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { 
   Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut, 
-  User, ShieldCheck, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
+  User, Users, ShieldCheck, ShieldAlert, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
   TrendingUp, Activity, CheckCircle2, Clock, Eye, EyeOff, Phone, Lock, AlertCircle, Laptop, Mail,
   FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download, 
   Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown
 } from "lucide-react";
+import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
+import { getUsers, updateUserRole, updateUserStatus, deleteUser } from "@/lib/api";
 
 
 
 interface UserProfile {
+  id: string;
   email: string;
   full_name: string;
   role: string;
@@ -73,6 +76,101 @@ export default function DashboardPage() {
   const [profileError, setProfileError] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
   const [profileSubmitting, setProfileSubmitting] = useState(false);
+  const [isProfilePasswordValid, setIsProfilePasswordValid] = useState(false);
+
+  // User Management States
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [usersSearchQuery, setUsersSearchQuery] = useState("");
+  const [usersRoleFilter, setUsersRoleFilter] = useState("all");
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<any | null>(null);
+  const [deleteInputVerify, setDeleteInputVerify] = useState("");
+  const [updatingUserRoleMap, setUpdatingUserRoleMap] = useState<Record<string, boolean>>({});
+  const [updatingUserStatusMap, setUpdatingUserStatusMap] = useState<Record<string, boolean>>({});
+
+  const fetchUsersList = async (authToken: string) => {
+    setUsersLoading(true);
+    setUsersError("");
+    try {
+      const data = await getUsers(authToken);
+      setUsersList(data);
+    } catch (err: any) {
+      setUsersError(err.message || "Kullanıcı listesi yüklenemedi.");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleRoleChange = async (targetUser: any, newRole: string) => {
+    if (!token) return;
+    if (targetUser.id === user?.id) {
+      alert("Kendi rolünüzü değiştiremezsiniz.");
+      return;
+    }
+    
+    setUpdatingUserRoleMap((prev) => ({ ...prev, [targetUser.id]: true }));
+    try {
+      await updateUserRole(targetUser.id, newRole, token);
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === targetUser.id ? { ...u, role: newRole } : u))
+      );
+    } catch (err: any) {
+      alert(err.message || "Rol güncellenirken bir hata oluştu.");
+    } finally {
+      setUpdatingUserRoleMap((prev) => ({ ...prev, [targetUser.id]: false }));
+    }
+  };
+
+  const handleStatusToggle = async (targetUser: any) => {
+    if (!token) return;
+    if (targetUser.id === user?.id) {
+      alert("Kendi hesabınızı askıya alamazsınız.");
+      return;
+    }
+    
+    const newStatus = !targetUser.is_active;
+    
+    setUpdatingUserStatusMap((prev) => ({ ...prev, [targetUser.id]: true }));
+    try {
+      await updateUserStatus(targetUser.id, newStatus, token);
+      setUsersList((prev) =>
+        prev.map((u) => (u.id === targetUser.id ? { ...u, is_active: newStatus } : u))
+      );
+    } catch (err: any) {
+      alert(err.message || "Kullanıcı durumu güncellenirken bir hata oluştu.");
+    } finally {
+      setUpdatingUserStatusMap((prev) => ({ ...prev, [targetUser.id]: false }));
+    }
+  };
+
+  const handleUserDelete = async () => {
+    if (!token || !deleteConfirmUser) return;
+    if (deleteConfirmUser.id === user?.id) {
+      alert("Kendi hesabınızı silemezsiniz.");
+      return;
+    }
+
+    if (deleteInputVerify.trim() !== "SİL") {
+      alert("Lütfen onaylamak için 'SİL' yazın.");
+      return;
+    }
+
+    try {
+      await deleteUser(deleteConfirmUser.id, token);
+      setUsersList((prev) => prev.filter((u) => u.id !== deleteConfirmUser.id));
+      setDeleteConfirmUser(null);
+      setDeleteInputVerify("");
+    } catch (err: any) {
+      alert(err.message || "Kullanıcı silinirken bir hata oluştu.");
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "users" && token) {
+      fetchUsersList(token);
+    }
+  }, [activeTab, token]);
 
 
   // Location API states
@@ -253,8 +351,8 @@ export default function DashboardPage() {
     setProfileError("");
     setProfileSuccess("");
 
-    if (profilePassword && profilePassword.length < 6) {
-      setProfileError("Şifre en az 6 karakter olmalıdır.");
+    if (profilePassword && !isProfilePasswordValid) {
+      setProfileError("Yeni şifreniz yeterince güçlü değil veya kuralları karşılamıyor.");
       return;
     }
 
@@ -988,18 +1086,33 @@ export default function DashboardPage() {
             )}
 
             {user.role === "admin" && (
-              <button
-                onClick={() => { setActiveTab("settings"); setSearchQuery(""); }}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
-                  activeTab === "settings" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Site Ayarları (CMS)</span>
-                </div>
-                <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "settings" ? "text-navy-dark" : "text-gold"}`} />
-              </button>
+              <>
+                <button
+                  onClick={() => { setActiveTab("users"); setSearchQuery(""); }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                    activeTab === "users" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Users className="w-4 h-4" />
+                    <span>Kullanıcı Yönetimi</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "users" ? "text-navy-dark" : "text-gold"}`} />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("settings"); setSearchQuery(""); }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                    activeTab === "settings" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Site Ayarları (CMS)</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "settings" ? "text-navy-dark" : "text-gold"}`} />
+                </button>
+              </>
             )}
 
             {hasAccess("messages") && (
@@ -2899,6 +3012,7 @@ export default function DashboardPage() {
                           {showProfilePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+                      <PasswordStrengthMeter password={profilePassword} onValidationChange={setIsProfilePasswordValid} />
                     </div>
 
                     {/* Confirm Password */}
@@ -2927,7 +3041,7 @@ export default function DashboardPage() {
                     <div className="flex justify-end pt-4">
                       <button
                         type="submit"
-                        disabled={profileSubmitting}
+                        disabled={profileSubmitting || (!!profilePassword && !isProfilePasswordValid)}
                         className="px-8 py-3 bg-gradient-to-r from-gold-dark via-gold to-gold-light hover:from-gold-light hover:to-gold-dark text-navy-dark font-bold text-xs rounded-lg transition-all shadow-lg hover:shadow-gold/15 active:scale-98 disabled:opacity-50 flex items-center space-x-2"
                       >
                         {profileSubmitting ? (
@@ -2943,6 +3057,236 @@ export default function DashboardPage() {
 
                   </form>
                 </div>
+              </div>
+            )}
+
+            {activeTab === "users" && user.role === "admin" && (
+              <div className="space-y-6 animate-fade-in-up">
+                {/* Header */}
+                <div className="border-b border-gold/10 pb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">Kullanıcı Yönetimi</h2>
+                    <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Sistemdeki tüm kullanıcıları görüntüleyin, rollerini ve durumlarını yönetin</p>
+                  </div>
+                  {/* Stats Counter */}
+                  <div className="bg-navy-dark border border-gold/10 px-4 py-2 rounded-xl flex items-center space-x-4 text-[10px]">
+                    <div className="flex flex-col">
+                      <span className="text-cream/50 uppercase">Toplam</span>
+                      <span className="text-gold font-bold text-sm">{usersList.length}</span>
+                    </div>
+                    <div className="h-6 w-px bg-gold/10" />
+                    <div className="flex flex-col">
+                      <span className="text-cream/50 uppercase">Aktif</span>
+                      <span className="text-emerald-400 font-bold text-sm">
+                        {usersList.filter(u => u.is_active).length}
+                      </span>
+                    </div>
+                    <div className="h-6 w-px bg-gold/10" />
+                    <div className="flex flex-col">
+                      <span className="text-cream/50 uppercase">Askıda</span>
+                      <span className="text-red-400 font-bold text-sm">
+                        {usersList.filter(u => !u.is_active).length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filter and Search Bar */}
+                <div className="bg-navy border border-gold/10 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  {/* Search */}
+                  <div className="relative w-full md:max-w-sm">
+                    <Search className="absolute left-3 top-3 w-4 h-4 text-cream/35" />
+                    <input
+                      type="text"
+                      placeholder="Ad, Soyad veya E-posta ara..."
+                      value={usersSearchQuery}
+                      onChange={(e) => setUsersSearchQuery(e.target.value)}
+                      className="w-full bg-navy-dark border border-gold/10 focus:border-gold rounded-lg pl-10 pr-4 py-2.5 text-xs text-cream placeholder-cream/35 outline-none transition-colors"
+                    />
+                  </div>
+
+                  {/* Filter */}
+                  <div className="flex items-center space-x-2 w-full md:w-auto">
+                    <span className="text-[10px] uppercase font-bold text-cream/50 tracking-wider shrink-0">Rol Filtresi:</span>
+                    <select
+                      value={usersRoleFilter}
+                      onChange={(e) => setUsersRoleFilter(e.target.value)}
+                      className="bg-navy-dark border border-gold/10 text-cream text-xs rounded-lg px-3 py-2 outline-none focus:border-gold"
+                    >
+                      <option value="all">Tüm Roller</option>
+                      <option value="admin">Yönetici (Admin)</option>
+                      <option value="architect">Mimar (Architect)</option>
+                      <option value="agent">Emlak Danışmanı (Agent)</option>
+                      <option value="developer">Yazılımcı (Developer)</option>
+                      <option value="editor">Editör (Editor)</option>
+                      <option value="subscriber">Abone (Subscriber)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Users Table / Grid */}
+                {usersLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-3">
+                    <RefreshCw className="w-6 h-6 text-gold animate-spin" />
+                    <span className="text-[10px] text-cream/40 uppercase tracking-wider">Kullanıcılar yükleniyor...</span>
+                  </div>
+                ) : usersError ? (
+                  <div className="bg-red-950/40 border border-red-500/20 text-red-200 text-xs px-4 py-3 rounded-lg flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{usersError}</span>
+                  </div>
+                ) : (
+                  <div className="bg-navy border border-gold/10 rounded-xl overflow-hidden shadow-2xl">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-cream">
+                        <thead>
+                          <tr className="bg-navy-dark/60 border-b border-gold/10 text-[10px] uppercase font-bold tracking-wider text-cream/60">
+                            <th className="py-4 px-6">Kullanıcı</th>
+                            <th className="py-4 px-6">Rol Yetkisi</th>
+                            <th className="py-4 px-6">Doğrulama & Durum</th>
+                            <th className="py-4 px-6">Kayıt Tarihi</th>
+                            <th className="py-4 px-6 text-right">İşlemler</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gold/5 text-xs">
+                          {usersList
+                            .filter((u) => {
+                              const matchQuery =
+                                u.full_name?.toLowerCase().includes(usersSearchQuery.toLowerCase()) ||
+                                u.email?.toLowerCase().includes(usersSearchQuery.toLowerCase());
+                              const matchRole =
+                                usersRoleFilter === "all" || u.role === usersRoleFilter;
+                              return matchQuery && matchRole;
+                            })
+                            .map((u) => {
+                              const isSelf = u.id === user?.id;
+                              return (
+                                <tr key={u.id} className="hover:bg-navy-dark/30 transition-colors">
+                                  {/* User Details */}
+                                  <td className="py-4 px-6">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="w-9 h-9 rounded-full bg-gold/10 border border-gold/25 flex items-center justify-center font-bold text-gold text-sm shrink-0">
+                                        {u.full_name ? u.full_name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="font-semibold text-cream">{u.full_name} {isSelf && <span className="text-[10px] text-gold font-bold ml-1.5 px-1.5 py-0.5 bg-gold/15 rounded border border-gold/20">Siz</span>}</span>
+                                        <span className="text-[10px] text-cream/40">{u.email}</span>
+                                        {u.phone && <span className="text-[10px] text-cream/40 mt-0.5">{u.phone}</span>}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* User Role */}
+                                  <td className="py-4 px-6">
+                                    {isSelf ? (
+                                      <span className="text-cream/80 text-[11px] font-medium capitalize">
+                                        {u.role === "admin" ? "Yönetici (Admin)" : u.role}
+                                      </span>
+                                    ) : (
+                                      <div className="flex items-center space-x-2">
+                                        <select
+                                          value={u.role}
+                                          disabled={updatingUserRoleMap[u.id]}
+                                          onChange={(e) => handleRoleChange(u, e.target.value)}
+                                          className="bg-navy-dark border border-gold/10 text-cream text-[11px] rounded px-2.5 py-1.5 outline-none focus:border-gold disabled:opacity-50"
+                                        >
+                                          <option value="admin">Yönetici (Admin)</option>
+                                          <option value="architect">Mimar (Architect)</option>
+                                          <option value="agent">Emlak Danışmanı (Agent)</option>
+                                          <option value="developer">Yazılımcı (Developer)</option>
+                                          <option value="editor">Editör (Editor)</option>
+                                          <option value="subscriber">Abone (Subscriber)</option>
+                                        </select>
+                                        {updatingUserRoleMap[u.id] && (
+                                          <RefreshCw className="w-3.5 h-3.5 text-gold animate-spin shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  {/* Verification & Status */}
+                                  <td className="py-4 px-6">
+                                    <div className="flex flex-col space-y-2">
+                                      {/* Verification status badge */}
+                                      <div className="flex items-center space-x-1.5">
+                                        {u.is_verified ? (
+                                          <span className="inline-flex items-center gap-1 text-[9px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded font-bold uppercase tracking-wide border border-green-500/20">
+                                            Doğrulanmış
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 text-[9px] bg-gray-500/10 text-cream/40 px-2 py-0.5 rounded font-bold uppercase tracking-wide border border-gold/5">
+                                            Doğrulanmamış
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Active toggle */}
+                                      <div className="flex items-center space-x-2">
+                                        {isSelf ? (
+                                          <span className="text-[10px] text-green-400 font-bold uppercase">Aktif</span>
+                                        ) : (
+                                          <>
+                                            <button
+                                              onClick={() => handleStatusToggle(u)}
+                                              disabled={updatingUserStatusMap[u.id]}
+                                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                u.is_active ? "bg-emerald-500" : "bg-red-500/30"
+                                              }`}
+                                            >
+                                              <span
+                                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                  u.is_active ? "translate-x-4" : "translate-x-0"
+                                                }`}
+                                              />
+                                            </button>
+                                            <span className={`text-[10px] font-bold uppercase ${u.is_active ? "text-emerald-400" : "text-red-400"}`}>
+                                              {u.is_active ? "Aktif" : "Askıda"}
+                                            </span>
+                                            {updatingUserStatusMap[u.id] && (
+                                              <RefreshCw className="w-3.5 h-3.5 text-gold animate-spin shrink-0" />
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  {/* Created At Date */}
+                                  <td className="py-4 px-6 text-cream/60 text-[11px]">
+                                    {u.created_at ? new Date(u.created_at).toLocaleDateString("tr-TR", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    }) : "-"}
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="py-4 px-6 text-right">
+                                    {isSelf ? (
+                                      <span className="text-cream/30 text-[10px] italic">Yönetici</span>
+                                    ) : (
+                                      <button
+                                        onClick={() => {
+                                          setDeleteConfirmUser(u);
+                                          setDeleteInputVerify("");
+                                        }}
+                                        className="inline-flex p-2 bg-red-950/20 hover:bg-red-650/35 border border-red-500/10 hover:border-red-500/30 text-red-400 rounded-lg transition-colors cursor-pointer"
+                                        title="Kullanıcıyı Sil"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -3621,6 +3965,69 @@ export default function DashboardPage() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4">
+          <div className="bg-navy border border-red-500/35 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up">
+            
+            {/* Modal Header */}
+            <div className="bg-red-950/20 border-b border-red-500/25 p-5 flex items-center space-x-3 text-red-400">
+              <ShieldAlert className="w-5 h-5 shrink-0" />
+              <h3 className="font-playfair text-base font-bold">Kullanıcıyı Sil - Çift Aşamalı Onay</h3>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 text-xs text-cream">
+              <p className="leading-relaxed">
+                <strong className="text-red-400">{deleteConfirmUser.full_name || deleteConfirmUser.email}</strong> kullanıcısını sistemden tamamen silmek üzeresiniz. Bu işlem <strong>geri alınamaz</strong> ve kullanıcının tüm ilişkili verileri silinecektir.
+              </p>
+              
+              <div className="bg-navy-dark border border-gold/10 p-3 rounded-lg space-y-1">
+                <p className="text-[10px] text-cream/50 uppercase font-bold tracking-wider">Silinecek Hesap Bilgileri</p>
+                <p className="font-semibold text-gold">{deleteConfirmUser.full_name}</p>
+                <p className="text-cream/75">{deleteConfirmUser.email}</p>
+                <p className="text-cream/50">Rol: <span className="capitalize">{deleteConfirmUser.role}</span></p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider">
+                  Silmek için aşağıdaki kutuya büyük harflerle <span className="text-red-400 font-extrabold">SİL</span> yazın:
+                </label>
+                <input
+                  type="text"
+                  placeholder="SİL"
+                  value={deleteInputVerify}
+                  onChange={(e) => setDeleteInputVerify(e.target.value)}
+                  className="w-full bg-navy-dark border border-red-500/25 focus:border-red-500 rounded-lg px-4 py-2.5 text-center font-bold tracking-widest text-red-200 outline-none placeholder-red-500/20 transition-all duration-200"
+                />
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex space-x-3 p-5 border-t border-gold/10 justify-end bg-navy-dark/30">
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteConfirmUser(null);
+                  setDeleteInputVerify("");
+                }}
+                className="px-5 py-2.5 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold/25 text-cream/70 hover:text-cream rounded-lg font-bold transition-all text-xs"
+              >
+                Vazgeç
+              </button>
+              <button
+                type="button"
+                onClick={handleUserDelete}
+                disabled={deleteInputVerify.trim() !== "SİL"}
+                className="px-6 py-2.5 bg-gradient-to-r from-red-700 to-red-650 hover:from-red-650 hover:to-red-700 text-white rounded-lg font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed text-xs shadow-md shadow-red-950/20"
+              >
+                Kullanıcıyı Kalıcı Olarak Sil
+              </button>
+            </div>
+
           </div>
         </div>
       )}

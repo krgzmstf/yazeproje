@@ -68,3 +68,12 @@ class ResendVerifyRequest(BaseModel):
     email: str
 
 
+class UserRoleUpdate(BaseModel):
+    role: UserRole
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+
+

@@ -32,6 +32,7 @@ jinja2==3.1.5
 python-slugify==8.0.4
 Pillow==11.1.0
 python-dotenv==1.0.1
+zxcvbn==4.4.28
 
 # ── Dev / Testing ────────────────────────────────────────────────
 pytest==8.3.4
