@@ -117,11 +117,31 @@ services:
     networks:
       - yaze-network
 
+  # ── n8n (Workflow Automation) ─────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: yaze-n8n
+    restart: unless-stopped
+    ports:
+      - "1006:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:1006/
+      - GENERIC_TIMEZONE=Europe/Istanbul
+      - TZ=Europe/Istanbul
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - yaze-network
+
 volumes:
   postgres_data:
   redis_data:
   backend_uploads:
   frontend_node_modules:
+  n8n_data:
 
 networks:
   yaze-network:
