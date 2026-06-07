@@ -116,6 +116,19 @@ def categorize(subject: str, snippet: str, sender: str, headers: dict) -> EmailR
     )
 
 
+_BILDIRIM_DOMAINS = [
+    "@google.com", "@microsoft.com", "@azure.com", "@azuredevops.com",
+    "@github.com", "@gitlab.com", "@jira.com", "@atlassian.com",
+    "@slack.com", "@zoom.us", "@linkedin.com", "@twitter.com",
+    "@facebook.com", "@instagram.com", "@apple.com", "@amazon.com",
+    "@dropbox.com", "@notion.so", "@figma.com",
+]
+
+_KISISEL_ADDRESSES = [
+    "krgzmstf@gmail.com", "msstfkrgz@gmail.com",
+]
+
+
 def _detect_category(text: str, headers: dict) -> str:
     # List-Unsubscribe header varsa → haber bülteni
     if headers.get("list-unsubscribe") or headers.get("list-id"):
@@ -124,6 +137,14 @@ def _detect_category(text: str, headers: dict) -> str:
     # Gönderici noreply mi?
     if re.search(r"no.?reply|do.?not.?reply", text):
         return "BILDIRIM_OTO"
+
+    # Bilinen tech/servis domainleri → bildirim
+    if any(domain in text for domain in _BILDIRIM_DOMAINS):
+        return "BILDIRIM_OTO"
+
+    # Kendi adresleri → kişisel
+    if any(addr in text for addr in _KISISEL_ADDRESSES):
+        return "KISISEL"
 
     # Anahtar kelime eşleştirme
     for category, keywords in _RULES:
