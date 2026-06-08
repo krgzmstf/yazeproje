@@ -3,15 +3,20 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { 
-  Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut, 
+import {
+  Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut,
   User, Users, ShieldCheck, ShieldAlert, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
   TrendingUp, Activity, CheckCircle2, Clock, Eye, EyeOff, Phone, Lock, AlertCircle, Laptop, Mail,
-  FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download, 
-  Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown
+  FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download,
+  Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown,
+  MessageSquare, Upload, ChevronDown, CheckCheck, XCircle, Flag
 } from "lucide-react";
 import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
-import { getUsers, updateUserRole, updateUserStatus, deleteUser, adminUpdateUser } from "@/lib/api";
+import {
+  getUsers, updateUserRole, updateUserStatus, deleteUser, adminUpdateUser,
+  getAdminComments, updateCommentStatus, deleteComment, type Comment as CommentType,
+  getProjectPhases, createProjectPhase, updateProjectPhase, deleteProjectPhase, type ProjectPhase,
+} from "@/lib/api";
 
 
 
@@ -33,8 +38,10 @@ const getApiBaseUrl = () => {
     if (window.location.hostname.includes("yazeproje.com")) {
       return "https://api.yazeproje.com/api/v1";
     }
+    // Lokalde nginx üzerinden git (port 1000) — aynı origin, CORS sorunu yok
+    return `${window.location.protocol}//${window.location.hostname}:1000/api/v1`;
   }
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:1002/api/v1";
+  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:1000/api/v1";
 };
 
 export default function DashboardPage() {
@@ -60,6 +67,8 @@ export default function DashboardPage() {
   const [modalType, setModalType] = useState<"project" | "listing" | "news" | "software" | "announcement" | "event">("project");
   const [editId, setEditId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryUploading, setGalleryUploading] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState<any>({});
@@ -89,6 +98,24 @@ export default function DashboardPage() {
   const [updatingUserRoleMap, setUpdatingUserRoleMap] = useState<Record<string, boolean>>({});
   const [updatingUserStatusMap, setUpdatingUserStatusMap] = useState<Record<string, boolean>>({});
 
+  // Comment Moderation States
+  const [commentsList, setCommentsList] = useState<CommentType[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsStatusFilter, setCommentsStatusFilter] = useState<string>("all");
+
+  // Phase Management States
+  const [phaseProjectId, setPhaseProjectId] = useState<string | null>(null);
+  const [phaseProjectTitle, setPhaseProjectTitle] = useState<string>("");
+  const [phases, setPhases] = useState<ProjectPhase[]>([]);
+  const [phasesLoading, setPhasesLoading] = useState(false);
+  const [phaseModalOpen, setPhaseModalOpen] = useState(false);
+  const [editPhaseId, setEditPhaseId] = useState<string | null>(null);
+  const [phaseForm, setPhaseForm] = useState({ name: "", description: "", status: "not_started", progress_pct: 0, sort_order: 0, start_date: "", end_date: "" });
+
+  // Avatar States
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   // User Edit Modal States
   const [editUserModalUser, setEditUserModalUser] = useState<any | null>(null);
   const [editUserFormName, setEditUserFormName] = useState("");
@@ -113,6 +140,101 @@ export default function DashboardPage() {
       setUsersError(err.message || "Kullanıcı listesi yüklenemedi.");
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const fetchComments = async (authToken: string) => {
+    setCommentsLoading(true);
+    try {
+      const data = await getAdminComments(authToken);
+      setCommentsList(data);
+    } catch { /* ignore */ } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleCommentStatus = async (id: string, status: any) => {
+    if (!token) return;
+    try {
+      const updated = await updateCommentStatus(id, status, token);
+      setCommentsList(prev => prev.map(c => c.id === id ? updated : c));
+    } catch { alert("Yorum durumu güncellenemedi."); }
+  };
+
+  const handleCommentDelete = async (id: string) => {
+    if (!token || !window.confirm("Bu yorumu silmek istediğinize emin misiniz?")) return;
+    try {
+      await deleteComment(id, token);
+      setCommentsList(prev => prev.filter(c => c.id !== id));
+    } catch { alert("Yorum silinemedi."); }
+  };
+
+  const openPhaseManager = async (projectId: string, projectTitle: string) => {
+    setPhaseProjectId(projectId);
+    setPhaseProjectTitle(projectTitle);
+    setPhasesLoading(true);
+    try {
+      if (token) {
+        const data = await getProjectPhases(projectId, token);
+        setPhases(data);
+      }
+    } catch { setPhases([]); } finally {
+      setPhasesLoading(false);
+    }
+  };
+
+  const handlePhaseSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !phaseProjectId) return;
+    try {
+      const payload = {
+        name: phaseForm.name,
+        description: phaseForm.description || null,
+        status: phaseForm.status as any,
+        progress_pct: Number(phaseForm.progress_pct),
+        sort_order: Number(phaseForm.sort_order),
+        start_date: phaseForm.start_date || null,
+        end_date: phaseForm.end_date || null,
+      };
+      if (editPhaseId) {
+        const updated = await updateProjectPhase(phaseProjectId, editPhaseId, payload, token);
+        setPhases(prev => prev.map(p => p.id === editPhaseId ? updated : p));
+      } else {
+        const created = await createProjectPhase(phaseProjectId, payload, token);
+        setPhases(prev => [...prev, created]);
+      }
+      setPhaseModalOpen(false);
+      setEditPhaseId(null);
+      setPhaseForm({ name: "", description: "", status: "not_started", progress_pct: 0, sort_order: 0, start_date: "", end_date: "" });
+    } catch { alert("Faz kaydedilemedi."); }
+  };
+
+  const handlePhaseDelete = async (phaseId: string) => {
+    if (!token || !phaseProjectId || !window.confirm("Bu fazı silmek istediğinize emin misiniz?")) return;
+    try {
+      await deleteProjectPhase(phaseProjectId, phaseId, token);
+      setPhases(prev => prev.filter(p => p.id !== phaseId));
+    } catch { alert("Faz silinemedi."); }
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!token) return;
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const apiBase = getApiBaseUrl();
+      const res = await fetch(`${apiBase}/upload/image`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error("Yükleme başarısız");
+      const data = await res.json();
+      const url = data.url || data.file_url || "";
+      setAvatarUrl(url);
+    } catch { alert("Avatar yüklenemedi."); } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -241,6 +363,9 @@ export default function DashboardPage() {
   useEffect(() => {
     if (activeTab === "users" && token) {
       fetchUsersList(token);
+    }
+    if (activeTab === "comments" && token) {
+      fetchComments(token);
     }
   }, [activeTab, token]);
 
@@ -440,6 +565,7 @@ export default function DashboardPage() {
         full_name: profileName,
         email: profileEmail,
         phone: profilePhone || null,
+        avatar_url: avatarUrl || null,
       };
       if (profilePassword) {
         payload.password = profilePassword;
@@ -495,6 +621,7 @@ export default function DashboardPage() {
     if (tabName === "events" && user.role === "editor") return true;
     if (tabName === "software" && user.role === "developer") return true;
     if (tabName === "messages" && (user.role === "admin" || user.role === "editor")) return true;
+    if (tabName === "comments" && (user.role === "admin" || user.role === "editor")) return true;
     if (tabName === "overview") return true;
     return false;
   };
@@ -555,6 +682,45 @@ export default function DashboardPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = 10 - galleryImages.length;
+    if (remaining <= 0) { alert("En fazla 10 görsel yükleyebilirsiniz."); return; }
+    const toUpload = files.slice(0, remaining);
+    setGalleryUploading(true);
+    const apiBase = getApiBaseUrl();
+    const uploaded: string[] = [];
+    for (const file of toUpload) {
+      const fd = new FormData();
+      fd.append("file", file);
+      try {
+        const res = await fetch(`${apiBase}/upload/image`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          uploaded.push(data.url);
+        } else {
+          const err = await res.json();
+          alert(`${file.name} yüklenemedi: ${err.detail || "Hata"}`);
+        }
+      } catch { alert(`${file.name} yüklenirken bağlantı hatası.`); }
+    }
+    setGalleryImages((prev) => {
+      const next = [...prev, ...uploaded].slice(0, 10);
+      // İlk resim vitrin olarak otomatik seçilsin (eğer henüz vitrin yoksa)
+      if (!formData.cover_image_url && next.length > 0) {
+        setFormData((fd: any) => ({ ...fd, cover_image_url: next[0] }));
+      }
+      return next;
+    });
+    e.target.value = "";
+    setGalleryUploading(false);
   };
 
   const handleFileAndInstallerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -814,6 +980,7 @@ export default function DashboardPage() {
   const openAddModal = (type: "project" | "listing" | "news" | "software" | "announcement" | "event") => {
     setModalType(type);
     setEditId(null);
+    setGalleryImages([]);
     if (type === "project") {
       setFormData({
         title: "",
@@ -917,6 +1084,13 @@ export default function DashboardPage() {
   const openEditModal = (type: "project" | "listing" | "news" | "software" | "announcement" | "event", item: any) => {
     setModalType(type);
     setEditId(item.id);
+    // Proje gallery'sini yükle
+    if (type === "project") {
+      const imgs: string[] = item.gallery_urls?.images || [];
+      setGalleryImages(imgs);
+    } else {
+      setGalleryImages([]);
+    }
     if (type === "listing") {
       let street = "";
       let buildingNo = "";
@@ -961,13 +1135,18 @@ export default function DashboardPage() {
         ? `${apiBase}/${path}/${editId}` 
         : `${apiBase}/${path}${hasNoTrailingSlash ? "" : "/"}`;
 
+      // Proje için gallery_urls'yi ekle
+      const body = modalType === "project"
+        ? { ...formData, gallery_urls: galleryImages.length > 0 ? { images: galleryImages } : null }
+        : formData;
+
       const response = await fetch(url, {
         method: method,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -1199,6 +1378,21 @@ export default function DashboardPage() {
                   <span>Gelen Mesajlar</span>
                 </div>
                 <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "messages" ? "text-navy-dark" : "text-gold"}`} />
+              </button>
+            )}
+
+            {hasAccess("comments") && (
+              <button
+                onClick={() => { setActiveTab("comments"); setSearchQuery(""); }}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                  activeTab === "comments" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Yorum Moderasyonu</span>
+                </div>
+                <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "comments" ? "text-navy-dark" : "text-gold"}`} />
               </button>
             )}
 
@@ -1465,7 +1659,14 @@ export default function DashboardPage() {
                               </div>
                             </td>
                             <td className="p-4 text-right">
-                              <div className="flex items-center justify-end space-x-3">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button
+                                  onClick={() => openPhaseManager(proj.id, proj.title)}
+                                  title="Faz Yönetimi"
+                                  className="p-1.5 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold/40 text-gold/50 hover:text-gold rounded transition-all"
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
+                                </button>
                                 <button
                                   onClick={() => openEditModal("project", proj)}
                                   className="p-1.5 bg-navy-dark hover:bg-navy border border-gold/10 hover:border-gold text-cream/60 hover:text-gold rounded transition-all"
@@ -2983,6 +3184,83 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {activeTab === "comments" && hasAccess("comments") && (
+              <div className="space-y-6 animate-fade-in-up">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-5">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">Yorum Moderasyonu</h2>
+                    <p className="text-[10px] text-cream/50 uppercase tracking-widest mt-1">Tüm yorumları görüntüle, onayla veya reddet</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={commentsStatusFilter}
+                      onChange={(e) => setCommentsStatusFilter(e.target.value)}
+                      className="bg-navy-dark border border-gold/10 text-cream text-xs rounded-lg px-3 py-2 outline-none"
+                    >
+                      <option value="all">Tümü</option>
+                      <option value="pending">Bekleyen</option>
+                      <option value="approved">Onaylı</option>
+                      <option value="rejected">Reddedilen</option>
+                      <option value="spam">Spam</option>
+                    </select>
+                    <button onClick={() => token && fetchComments(token)} className="px-3 py-2 bg-navy-dark border border-gold/10 rounded-lg text-xs text-gold hover:border-gold transition-colors">
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {commentsLoading ? (
+                  <div className="text-center py-10 text-cream/40 text-sm">Yükleniyor...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {commentsList
+                      .filter(c => commentsStatusFilter === "all" || c.status === commentsStatusFilter)
+                      .map((c) => (
+                        <div key={c.id} className="bg-navy border border-gold/10 rounded-xl p-4 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-bold text-gold">{c.guest_name || "Anonim"}</span>
+                              {c.guest_email && <span className="text-cream/40">&lt;{c.guest_email}&gt;</span>}
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                c.status === "approved" ? "bg-green-900/40 text-green-300 border border-green-500/20" :
+                                c.status === "pending" ? "bg-yellow-900/40 text-yellow-300 border border-yellow-500/20" :
+                                c.status === "rejected" ? "bg-red-900/40 text-red-300 border border-red-500/20" :
+                                "bg-gray-900/40 text-gray-300 border border-gray-500/20"
+                              }`}>{c.status === "approved" ? "Onaylı" : c.status === "pending" ? "Bekliyor" : c.status === "rejected" ? "Reddedildi" : "Spam"}</span>
+                            </div>
+                            <span className="text-[10px] text-cream/30">{new Date(c.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}</span>
+                          </div>
+                          <p className="text-sm text-cream/80 leading-relaxed">{c.body}</p>
+                          <div className="flex items-center gap-2 pt-1">
+                            {c.status !== "approved" && (
+                              <button onClick={() => handleCommentStatus(c.id, "approved")} className="flex items-center gap-1.5 text-[10px] font-bold text-green-400 border border-green-500/20 px-2.5 py-1 rounded-lg hover:bg-green-900/20 transition-colors">
+                                <CheckCheck className="w-3 h-3" /> Onayla
+                              </button>
+                            )}
+                            {c.status !== "rejected" && (
+                              <button onClick={() => handleCommentStatus(c.id, "rejected")} className="flex items-center gap-1.5 text-[10px] font-bold text-red-400 border border-red-500/20 px-2.5 py-1 rounded-lg hover:bg-red-900/20 transition-colors">
+                                <XCircle className="w-3 h-3" /> Reddet
+                              </button>
+                            )}
+                            {c.status !== "spam" && (
+                              <button onClick={() => handleCommentStatus(c.id, "spam")} className="flex items-center gap-1.5 text-[10px] font-bold text-orange-400 border border-orange-500/20 px-2.5 py-1 rounded-lg hover:bg-orange-900/20 transition-colors">
+                                <Flag className="w-3 h-3" /> Spam
+                              </button>
+                            )}
+                            <button onClick={() => handleCommentDelete(c.id)} className="flex items-center gap-1.5 text-[10px] font-bold text-cream/40 border border-cream/10 px-2.5 py-1 rounded-lg hover:bg-red-950/20 hover:text-red-400 hover:border-red-500/20 transition-colors ml-auto">
+                              <Trash2 className="w-3 h-3" /> Sil
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    {commentsList.filter(c => commentsStatusFilter === "all" || c.status === commentsStatusFilter).length === 0 && (
+                      <p className="text-center text-cream/35 py-10 italic">Bu filtrede yorum yok.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {activeTab === "profile" && (
               <div className="space-y-6 animate-fade-in-up">
                 {/* Header */}
@@ -3010,6 +3288,33 @@ export default function DashboardPage() {
                   )}
 
                   <form onSubmit={handleProfileUpdate} className="space-y-5">
+                    {/* Avatar Upload */}
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Profil Fotoğrafı</label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-gold/20 bg-navy-dark flex items-center justify-center shrink-0">
+                          {avatarUrl ? (
+                            <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-7 h-7 text-cream/30" />
+                          )}
+                        </div>
+                        <label className="cursor-pointer flex items-center gap-2 text-xs font-bold text-gold border border-gold/20 px-3 py-2 rounded-lg hover:bg-navy-dark transition-colors">
+                          <Upload className="w-3.5 h-3.5" />
+                          {avatarUploading ? "Yükleniyor..." : "Fotoğraf Seç"}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => e.target.files?.[0] && handleAvatarUpload(e.target.files[0])}
+                          />
+                        </label>
+                        {avatarUrl && (
+                          <span className="text-[10px] text-cream/40 break-all max-w-xs">{avatarUrl}</span>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Full Name */}
                     <div>
                       <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Ad Soyad</label>
@@ -3424,6 +3729,59 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {/* Kapak Görseli — formun üstünde her zaman görünür */}
+              <div className="bg-navy-dark/50 border border-gold/15 rounded-xl p-4 space-y-3">
+                <label className="block text-[10px] uppercase font-bold text-gold/80 tracking-wider">
+                  Kapak Görseli (JPG / PNG / WebP)
+                </label>
+                <div className="flex gap-3 items-start">
+                  {/* Önizleme */}
+                  {formData.cover_image_url ? (
+                    <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-gold/20 shrink-0 bg-navy">
+                      <img src={formData.cover_image_url} alt="Kapak" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, cover_image_url: "" })}
+                        className="absolute top-0.5 right-0.5 bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold leading-none hover:bg-red-500"
+                      >×</button>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-lg border border-dashed border-gold/25 bg-navy flex items-center justify-center shrink-0 text-[9px] text-cream/30 text-center leading-tight p-1">
+                      Görsel Yok
+                    </div>
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={formData.cover_image_url || ""}
+                      onChange={(e) => setFormData({ ...formData, cover_image_url: e.target.value })}
+                      placeholder="URL yapıştırın veya sağdaki butonu kullanın..."
+                      className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-cream outline-none transition-colors text-xs"
+                    />
+                    <label className="flex items-center justify-center gap-2 w-full px-3 py-2 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg cursor-pointer font-bold transition-all text-xs select-none">
+                      {uploading ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          Yükleniyor...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          Bilgisayardan Seç (JPG/PNG/WebP)
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                        disabled={uploading}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               {/* PROJECT FORM FIELDS */}
               {modalType === "project" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 bg-navy-dark/45 p-5 rounded-xl border border-gold/5">
@@ -3490,6 +3848,98 @@ export default function DashboardPage() {
                       className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-4 py-2.5 text-cream outline-none"
                     />
                   </div>
+                </div>
+              )}
+
+              {/* PROJE GALERİ — en fazla 10 görsel, vitrin seçimi */}
+              {modalType === "project" && (
+                <div className="bg-navy-dark/50 border border-gold/15 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-bold text-gold/80 tracking-wider">
+                      Proje Galerisi — Vitrin Seçimi ({galleryImages.length}/10)
+                    </label>
+                    {galleryImages.length < 10 && (
+                      <label className="flex items-center gap-1.5 px-3 py-1.5 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg cursor-pointer font-bold transition-all text-[10px] select-none">
+                        {galleryUploading ? (
+                          <><RefreshCw className="w-3 h-3 animate-spin" /> Yükleniyor...</>
+                        ) : (
+                          <><Upload className="w-3 h-3" /> Görsel Ekle</>
+                        )}
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                          multiple
+                          onChange={handleGalleryImageUpload}
+                          className="hidden"
+                          disabled={galleryUploading}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {galleryImages.length === 0 ? (
+                    <div className="border border-dashed border-gold/20 rounded-lg p-6 text-center text-[10px] text-cream/35">
+                      Henüz görsel eklenmedi. Yukarıdaki butonu kullanarak JPG/PNG/WebP yükleyin.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                      {galleryImages.map((img, idx) => {
+                        const isVitrin = img === formData.cover_image_url;
+                        return (
+                          <div key={idx} className={`relative group rounded-lg overflow-hidden border-2 transition-all ${isVitrin ? "border-gold shadow-md shadow-gold/20" : "border-gold/10 hover:border-gold/40"}`}>
+                            <img src={img} alt={`Görsel ${idx + 1}`} className="w-full aspect-square object-cover" />
+                            {/* Vitrin rozeti */}
+                            {isVitrin && (
+                              <div className="absolute top-1 left-1 bg-gold text-navy-dark text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                ★ Vitrin
+                              </div>
+                            )}
+                            {/* İşlem butonları (hover'da görünür) */}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                              {!isVitrin && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFormData((fd: any) => ({ ...fd, cover_image_url: img }))}
+                                  className="w-full py-1 bg-gold text-navy-dark text-[9px] font-bold rounded hover:bg-gold-light transition-colors"
+                                >
+                                  ★ Vitrin Yap
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = galleryImages.filter((_, i) => i !== idx);
+                                  setGalleryImages(next);
+                                  if (isVitrin) {
+                                    setFormData((fd: any) => ({ ...fd, cover_image_url: next[0] || "" }));
+                                  }
+                                }}
+                                className="w-full py-1 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-500 transition-colors"
+                              >
+                                Kaldır
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {/* Boş slot göstergesi */}
+                      {galleryImages.length < 10 && (
+                        <label className="relative rounded-lg border-2 border-dashed border-gold/20 hover:border-gold/50 cursor-pointer transition-all aspect-square flex flex-col items-center justify-center text-cream/30 hover:text-gold transition-colors">
+                          <span className="text-2xl font-light">+</span>
+                          <span className="text-[9px] mt-0.5">{10 - galleryImages.length} boş</span>
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                            multiple
+                            onChange={handleGalleryImageUpload}
+                            className="hidden"
+                            disabled={galleryUploading}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[9px] text-cream/35">Üzerine gelip "Vitrin Yap"a tıklayarak kapak fotoğrafını seçin. İlk yüklenen otomatik vitrin olur.</p>
                 </div>
               )}
 
@@ -4007,30 +4457,6 @@ export default function DashboardPage() {
                 </>
               )}
 
-              {/* Media URL / Upload */}
-              <div className="space-y-2">
-                <label className="block text-[10px] uppercase font-bold text-cream/65 tracking-wider mb-2">Görsel / Kapak URL</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.cover_image_url || ""}
-                    onChange={(e) => setFormData({ ...formData, cover_image_url: e.target.value })}
-                    placeholder="https://images.unsplash.com/..."
-                    className="flex-1 bg-navy-dark border border-gold/10 focus:border-gold rounded-lg px-4 py-3 text-cream outline-none transition-colors"
-                  />
-                  <label className="flex items-center justify-center px-4 py-3 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg cursor-pointer font-bold transition-all text-xs select-none">
-                    {uploading ? "Yükleniyor..." : "Dosya Yükle"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                      disabled={uploading}
-                    />
-                  </label>
-                </div>
-              </div>
-
               {/* Form Actions */}
               <div className="flex space-x-3 pt-5 border-t border-gold/15 justify-end">
                 <button
@@ -4116,10 +4542,111 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Phase Manager Panel */}
+      {phaseProjectId && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-start p-4 overflow-y-auto">
+          <div className="bg-navy border border-gold/25 w-full max-w-2xl rounded-2xl shadow-2xl animate-fade-in-up my-8">
+            <div className="bg-navy-dark border-b border-gold/15 p-5 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-gold" />
+                <h3 className="font-playfair text-base font-bold text-gold">Faz Yönetimi</h3>
+                <span className="text-cream/40 text-xs">— {phaseProjectTitle}</span>
+              </div>
+              <button onClick={() => { setPhaseProjectId(null); setPhases([]); setPhaseModalOpen(false); }} className="text-cream/50 hover:text-cream text-xs">Kapat</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { setEditPhaseId(null); setPhaseForm({ name: "", description: "", status: "not_started", progress_pct: 0, sort_order: 0, start_date: "", end_date: "" }); setPhaseModalOpen(true); }}
+                  className="flex items-center gap-2 bg-gradient-to-r from-gold-dark to-gold text-navy-dark font-bold text-xs px-4 py-2 rounded-lg"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Yeni Faz Ekle
+                </button>
+              </div>
+              {phasesLoading ? (
+                <p className="text-center text-cream/40 py-6 text-sm">Yükleniyor...</p>
+              ) : phases.length === 0 ? (
+                <p className="text-center text-cream/30 py-6 italic text-sm">Henüz faz eklenmemiş.</p>
+              ) : (
+                <div className="space-y-2">
+                  {phases.sort((a, b) => a.sort_order - b.sort_order).map(ph => (
+                    <div key={ph.id} className="border border-gold/10 rounded-lg p-3 bg-navy/50 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-cream text-sm">{ph.name}</span>
+                          <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-gold/10 text-gold">{ph.status === "completed" ? "Tamamlandı" : ph.status === "in_progress" ? "Devam Ediyor" : ph.status === "delayed" ? "Gecikmeli" : "Başlamadı"}</span>
+                        </div>
+                        <div className="w-full h-1 bg-navy rounded-full overflow-hidden mb-1">
+                          <div className="h-full bg-gold rounded-full" style={{ width: `${ph.progress_pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-cream/40">%{ph.progress_pct} — {ph.start_date || "?"} → {ph.end_date || "?"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => { setEditPhaseId(ph.id); setPhaseForm({ name: ph.name, description: ph.description || "", status: ph.status, progress_pct: ph.progress_pct, sort_order: ph.sort_order, start_date: ph.start_date || "", end_date: ph.end_date || "" }); setPhaseModalOpen(true); }}
+                          className="p-1.5 border border-gold/10 hover:border-gold text-cream/50 hover:text-gold rounded transition-all"
+                        ><Edit className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handlePhaseDelete(ph.id)} className="p-1.5 border border-gold/10 hover:border-red-500/30 text-cream/50 hover:text-red-400 rounded transition-all">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {phaseModalOpen && (
+                <form onSubmit={handlePhaseSave} className="border border-gold/15 rounded-xl p-4 mt-4 bg-navy-dark space-y-3">
+                  <h4 className="font-bold text-gold text-sm">{editPhaseId ? "Fazı Düzenle" : "Yeni Faz"}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Faz Adı *</label>
+                      <input required value={phaseForm.name} onChange={(e) => setPhaseForm({...phaseForm, name: e.target.value})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Durum</label>
+                      <select value={phaseForm.status} onChange={(e) => setPhaseForm({...phaseForm, status: e.target.value})} className="w-full bg-navy border border-gold/10 rounded-lg px-3 py-2 text-xs text-cream outline-none">
+                        <option value="not_started">Başlamadı</option>
+                        <option value="in_progress">Devam Ediyor</option>
+                        <option value="completed">Tamamlandı</option>
+                        <option value="delayed">Gecikmeli</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">İlerleme % (0-100)</label>
+                      <input type="number" min="0" max="100" value={phaseForm.progress_pct} onChange={(e) => setPhaseForm({...phaseForm, progress_pct: Number(e.target.value)})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Sıra</label>
+                      <input type="number" min="0" value={phaseForm.sort_order} onChange={(e) => setPhaseForm({...phaseForm, sort_order: Number(e.target.value)})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Başlangıç Tarihi</label>
+                      <input type="date" value={phaseForm.start_date} onChange={(e) => setPhaseForm({...phaseForm, start_date: e.target.value})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Bitiş Tarihi</label>
+                      <input type="date" value={phaseForm.end_date} onChange={(e) => setPhaseForm({...phaseForm, end_date: e.target.value})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-cream/50 uppercase tracking-wider block mb-1">Açıklama</label>
+                    <textarea rows={2} value={phaseForm.description} onChange={(e) => setPhaseForm({...phaseForm, description: e.target.value})} className="w-full bg-navy border border-gold/10 focus:border-gold rounded-lg px-3 py-2 text-xs text-cream outline-none resize-none" />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-1">
+                    <button type="button" onClick={() => setPhaseModalOpen(false)} className="px-4 py-2 border border-gold/10 rounded-lg text-xs text-cream/60 hover:text-cream transition-colors">Vazgeç</button>
+                    <button type="submit" className="px-5 py-2 bg-gradient-to-r from-gold-dark to-gold text-navy-dark font-bold text-xs rounded-lg">Kaydet</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {editUserModalUser && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex justify-center items-center p-4">
           <div className="bg-navy border border-gold/25 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl animate-fade-in-up">
-            
+
             {/* Modal Header */}
             <div className="bg-navy-dark border-b border-gold/15 p-5 flex justify-between items-center">
               <div className="flex items-center space-x-2">

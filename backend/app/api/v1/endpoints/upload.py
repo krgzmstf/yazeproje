@@ -76,19 +76,11 @@ async def upload_image(
         image.save(file_path, "WEBP", quality=80)
         logger.info(f"Saved optimized image to {file_path}")
 
-        # Generate dynamic absolute URL
-        # We parse the base_url from request to support dev/prod dynamically
-        base_url = str(request.base_url).rstrip("/")
-        # If running inside docker container proxied by Nginx, Nginx handles port 80/443. 
-        # request.base_url might resolve to http://backend:8000 inside the internal network 
-        # if proxy headers are not fully processed. 
-        # But FastAPI with proxy headers (X-Forwarded-Host) or fallback to host header works.
-        # To be safe, we return the relative path "/api/v1/uploads/{filename}" so the frontend 
-        # can prepend its own API url, OR request.base_url.
-        # Let's return both the absolute URL (based on request) and the relative path!
-        # This gives the frontend total flexibility.
+        # Build URL using Host header (as sent by nginx) so the URL works in browser
+        host = request.headers.get("host", "localhost:1000")
+        proto = request.headers.get("x-forwarded-proto", "http")
         relative_path = f"{settings.API_V1_PREFIX}/uploads/{filename}"
-        absolute_url = f"{base_url}{relative_path}"
+        absolute_url = f"{proto}://{host}{relative_path}"
 
         return {
             "filename": filename,
@@ -145,9 +137,10 @@ async def upload_file(
 
         logger.info(f"Saved file to {file_path}")
 
-        base_url = str(request.base_url).rstrip("/")
+        host = request.headers.get("host", "localhost:1000")
+        proto = request.headers.get("x-forwarded-proto", "http")
         relative_path = f"{settings.API_V1_PREFIX}/uploads/{filename}"
-        absolute_url = f"{base_url}{relative_path}"
+        absolute_url = f"{proto}://{host}{relative_path}"
 
         return {
             "filename": filename,
