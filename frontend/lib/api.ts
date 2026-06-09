@@ -6,11 +6,12 @@
 const API_BASE_URL =
   process.env.API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined" && window.location.hostname.includes("yazeproje.com")
+  (typeof window !== "undefined" &&
+  window.location.hostname.includes("yazeproje.com")
     ? "https://api.yazeproje.com/api/v1"
-    : (process.env.NODE_ENV === "production"
+    : process.env.NODE_ENV === "production"
       ? "https://api.yazeproje.com/api/v1"
-      : "http://localhost:1002/api/v1"));
+      : "http://localhost:1002/api/v1");
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ export interface SubscriptionRequest {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
-  
+
   // Since we fetch on the server, we might want caching or revalidation.
   // We use `next: { revalidate: 60 }` to cache for 60 seconds (ISR).
   const defaultOptions: RequestInit = {
@@ -200,7 +201,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     const res = await fetch(url, defaultOptions);
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`API fetch error (${res.status}): ${errText || res.statusText}`);
+      throw new Error(
+        `API fetch error (${res.status}): ${errText || res.statusText}`,
+      );
     }
     return (await res.json()) as T;
   } catch (error) {
@@ -227,7 +230,9 @@ export async function getProjects(params?: {
   return apiFetch<ArchitectureProject[]>(`/projects${queryStr}`);
 }
 
-export async function getProjectBySlug(slug: string): Promise<ArchitectureProject> {
+export async function getProjectBySlug(
+  slug: string,
+): Promise<ArchitectureProject> {
   return apiFetch<ArchitectureProject>(`/projects/${slug}`);
 }
 
@@ -239,8 +244,10 @@ export async function getListings(params?: {
   limit?: number;
 }): Promise<RealEstateListing[]> {
   const searchParams = new URLSearchParams();
-  if (params?.listing_type) searchParams.append("listing_type", params.listing_type);
-  if (params?.property_type) searchParams.append("property_type", params.property_type);
+  if (params?.listing_type)
+    searchParams.append("listing_type", params.listing_type);
+  if (params?.property_type)
+    searchParams.append("property_type", params.property_type);
   if (params?.is_featured !== undefined)
     searchParams.append("is_featured", String(params.is_featured));
   if (params?.limit) searchParams.append("limit", String(params.limit));
@@ -249,7 +256,9 @@ export async function getListings(params?: {
   return apiFetch<RealEstateListing[]>(`/listings${queryStr}`);
 }
 
-export async function getListingBySlug(slug: string): Promise<RealEstateListing> {
+export async function getListingBySlug(
+  slug: string,
+): Promise<RealEstateListing> {
   return apiFetch<RealEstateListing>(`/listings/${slug}`);
 }
 
@@ -285,7 +294,9 @@ export async function getAnnouncements(params?: {
   return apiFetch<Announcement[]>(`/announcements${queryStr}`);
 }
 
-export async function getAnnouncementBySlug(slug: string): Promise<Announcement> {
+export async function getAnnouncementBySlug(
+  slug: string,
+): Promise<Announcement> {
   return apiFetch<Announcement>(`/announcements/${slug}`);
 }
 
@@ -308,18 +319,21 @@ export async function getEventBySlug(slug: string): Promise<Event> {
 }
 
 // Subscriptions (client-side submit, so no cache)
-export async function subscribe(
-  payload: SubscriptionRequest
-): Promise<{ status: string; message: string; details: Record<string, string> }> {
-  return apiFetch<{ status: string; message: string; details: Record<string, string> }>(
-    "/subscriptions",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-      cache: "no-store", // Do not cache POST requests
-      next: undefined,
-    }
-  );
+export async function subscribe(payload: SubscriptionRequest): Promise<{
+  status: string;
+  message: string;
+  details: Record<string, string>;
+}> {
+  return apiFetch<{
+    status: string;
+    message: string;
+    details: Record<string, string>;
+  }>("/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    cache: "no-store", // Do not cache POST requests
+    next: undefined,
+  });
 }
 
 // Site Settings
@@ -345,7 +359,7 @@ export async function getAdminSettings(token: string): Promise<any[]> {
 
 export async function updateSiteSettingsBulk(
   settings: Record<string, any>,
-  token: string
+  token: string,
 ): Promise<{ status: string; message: string }> {
   return apiFetch<{ status: string; message: string }>("/settings/bulk", {
     method: "PUT",
@@ -405,7 +419,9 @@ export async function getSoftwareProducts(params?: {
   return apiFetch<SoftwareProduct[]>(`/software${queryStr}`);
 }
 
-export async function getAdminSoftwareProducts(token: string): Promise<SoftwareProduct[]> {
+export async function getAdminSoftwareProducts(
+  token: string,
+): Promise<SoftwareProduct[]> {
   return apiFetch<SoftwareProduct[]>("/software/admin", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -416,13 +432,15 @@ export async function getAdminSoftwareProducts(token: string): Promise<SoftwareP
   });
 }
 
-export async function getSoftwareProductBySlug(slug: string): Promise<SoftwareProduct> {
+export async function getSoftwareProductBySlug(
+  slug: string,
+): Promise<SoftwareProduct> {
   return apiFetch<SoftwareProduct>(`/software/${slug}`);
 }
 
 export async function createSoftwareProduct(
   payload: Partial<SoftwareProduct>,
-  token: string
+  token: string,
 ): Promise<SoftwareProduct> {
   return apiFetch<SoftwareProduct>("/software/", {
     method: "POST",
@@ -439,7 +457,7 @@ export async function createSoftwareProduct(
 export async function updateSoftwareProduct(
   id: string,
   payload: Partial<SoftwareProduct>,
-  token: string
+  token: string,
 ): Promise<SoftwareProduct> {
   return apiFetch<SoftwareProduct>(`/software/${id}`, {
     method: "PUT",
@@ -455,7 +473,7 @@ export async function updateSoftwareProduct(
 
 export async function deleteSoftwareProduct(
   id: string,
-  token: string
+  token: string,
 ): Promise<{ message: string }> {
   return apiFetch<{ message: string }>(`/software/${id}`, {
     method: "DELETE",
@@ -496,7 +514,9 @@ export async function submitContactMessage(payload: {
   });
 }
 
-export async function getContactMessages(token: string): Promise<ContactMessage[]> {
+export async function getContactMessages(
+  token: string,
+): Promise<ContactMessage[]> {
   return apiFetch<ContactMessage[]>("/contact-messages", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -506,7 +526,10 @@ export async function getContactMessages(token: string): Promise<ContactMessage[
   });
 }
 
-export async function deleteContactMessage(id: string, token: string): Promise<{ message: string }> {
+export async function deleteContactMessage(
+  id: string,
+  token: string,
+): Promise<{ message: string }> {
   return apiFetch<{ message: string }>(`/contact-messages/${id}`, {
     method: "DELETE",
     headers: {
@@ -517,7 +540,6 @@ export async function deleteContactMessage(id: string, token: string): Promise<{
   });
 }
 
-
 export async function registerUser(payload: any): Promise<any> {
   return apiFetch<any>("/auth/register", {
     method: "POST",
@@ -525,7 +547,6 @@ export async function registerUser(payload: any): Promise<any> {
     cache: "no-store",
   });
 }
-
 
 export async function updateProfile(payload: any, token: string): Promise<any> {
   return apiFetch<any>("/auth/me", {
@@ -540,18 +561,23 @@ export async function updateProfile(payload: any, token: string): Promise<any> {
   });
 }
 
-
-
-export async function forgotPassword(email: string): Promise<{ status: string; message: string }> {
-  return apiFetch<{ status: string; message: string }>("/auth/forgot-password", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-    cache: "no-store",
-  });
+export async function forgotPassword(
+  email: string,
+): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>(
+    "/auth/forgot-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      cache: "no-store",
+    },
+  );
 }
 
-
-export async function resetPassword(token: string, password: string): Promise<{ status: string; message: string }> {
+export async function resetPassword(
+  token: string,
+  password: string,
+): Promise<{ status: string; message: string }> {
   return apiFetch<{ status: string; message: string }>("/auth/reset-password", {
     method: "POST",
     body: JSON.stringify({ token, password }),
@@ -559,8 +585,10 @@ export async function resetPassword(token: string, password: string): Promise<{ 
   });
 }
 
-
-export async function verifyEmail(email: string, code: string): Promise<{ status: string; message: string }> {
+export async function verifyEmail(
+  email: string,
+  code: string,
+): Promise<{ status: string; message: string }> {
   return apiFetch<{ status: string; message: string }>("/auth/verify-email", {
     method: "POST",
     body: JSON.stringify({ email, code }),
@@ -568,13 +596,17 @@ export async function verifyEmail(email: string, code: string): Promise<{ status
   });
 }
 
-
-export async function resendVerificationCode(email: string): Promise<{ status: string; message: string }> {
-  return apiFetch<{ status: string; message: string }>("/auth/resend-verification", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-    cache: "no-store",
-  });
+export async function resendVerificationCode(
+  email: string,
+): Promise<{ status: string; message: string }> {
+  return apiFetch<{ status: string; message: string }>(
+    "/auth/resend-verification",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+      cache: "no-store",
+    },
+  );
 }
 
 // User Management (Admin only)
@@ -589,7 +621,11 @@ export async function getUsers(token: string): Promise<any[]> {
   });
 }
 
-export async function updateUserRole(userId: string, role: string, token: string): Promise<any> {
+export async function updateUserRole(
+  userId: string,
+  role: string,
+  token: string,
+): Promise<any> {
   return apiFetch<any>(`/auth/users/${userId}/role`, {
     method: "PUT",
     body: JSON.stringify({ role }),
@@ -602,7 +638,11 @@ export async function updateUserRole(userId: string, role: string, token: string
   });
 }
 
-export async function updateUserStatus(userId: string, isActive: boolean, token: string): Promise<any> {
+export async function updateUserStatus(
+  userId: string,
+  isActive: boolean,
+  token: string,
+): Promise<any> {
   return apiFetch<any>(`/auth/users/${userId}/status`, {
     method: "PUT",
     body: JSON.stringify({ is_active: isActive }),
@@ -615,7 +655,10 @@ export async function updateUserStatus(userId: string, isActive: boolean, token:
   });
 }
 
-export async function deleteUser(userId: string, token: string): Promise<{ message: string }> {
+export async function deleteUser(
+  userId: string,
+  token: string,
+): Promise<{ message: string }> {
   return apiFetch<{ message: string }>(`/auth/users/${userId}`, {
     method: "DELETE",
     headers: {
@@ -629,8 +672,13 @@ export async function deleteUser(userId: string, token: string): Promise<{ messa
 
 export async function adminUpdateUser(
   userId: string,
-  payload: { full_name: string; email: string; phone: string | null; password?: string | null },
-  token: string
+  payload: {
+    full_name: string;
+    email: string;
+    phone: string | null;
+    password?: string | null;
+  },
+  token: string,
 ): Promise<any> {
   return apiFetch<any>(`/auth/users/${userId}`, {
     method: "PUT",
@@ -644,4 +692,127 @@ export async function adminUpdateUser(
   });
 }
 
+// ── Comments ───────────────────────────────────────────────────────────────
 
+export interface Comment {
+  id: string;
+  project_id: string | null;
+  listing_id: string | null;
+  guest_name: string;
+  guest_email: string | null;
+  body: string;
+  status: "pending" | "approved" | "rejected" | "spam";
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getAdminComments(token: string): Promise<Comment[]> {
+  return apiFetch<Comment[]>("/comments", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function updateCommentStatus(
+  id: string,
+  status: string,
+  token: string,
+): Promise<Comment> {
+  return apiFetch<Comment>(`/comments/${id}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function deleteComment(
+  id: string,
+  token: string,
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/comments/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+// ── Project Phases ─────────────────────────────────────────────────────────
+
+export async function getProjectPhases(
+  projectId: string,
+  token: string,
+): Promise<ProjectPhase[]> {
+  return apiFetch<ProjectPhase[]>(`/projects/${projectId}/phases`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function createProjectPhase(
+  projectId: string,
+  payload: Omit<
+    ProjectPhase,
+    "id" | "project_id" | "created_at" | "updated_at"
+  >,
+  token: string,
+): Promise<ProjectPhase> {
+  return apiFetch<ProjectPhase>(`/projects/${projectId}/phases`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function updateProjectPhase(
+  projectId: string,
+  phaseId: string,
+  payload: Partial<
+    Omit<ProjectPhase, "id" | "project_id" | "created_at" | "updated_at">
+  >,
+  token: string,
+): Promise<ProjectPhase> {
+  return apiFetch<ProjectPhase>(`/projects/${projectId}/phases/${phaseId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    cache: "no-store",
+  });
+}
+
+export async function deleteProjectPhase(
+  projectId: string,
+  phaseId: string,
+  token: string,
+): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(
+    `/projects/${projectId}/phases/${phaseId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+}
