@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.models.contact import NewsletterSubscriber, SmsSubscriber
 from app.schemas.contact import SubscriptionRequest
+from app.api.v1.endpoints.websockets import notify_admin
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -112,6 +113,17 @@ async def submit_contact_message(
     db.add(db_msg)
     await db.commit()
     await db.refresh(db_msg)
+    
+    # WebSocket Notification
+    try:
+        await notify_admin("new_contact_message", {
+            "id": str(db_msg.id),
+            "full_name": db_msg.full_name,
+            "subject": db_msg.subject
+        })
+    except Exception as e:
+        logger.error(f"Failed to send WS notification: {e}")
+        
     return db_msg
 
 

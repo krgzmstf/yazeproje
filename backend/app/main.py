@@ -6,6 +6,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from redis import asyncio as aioredis
 
 from app.core.config import get_settings
 from app.api.v1.router import api_router
@@ -20,6 +23,14 @@ async def lifespan(app: FastAPI):
     import logging
     logger = logging.getLogger(__name__)
     
+    # Initialize Redis for Caching
+    try:
+        redis = aioredis.from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
+        FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+        logger.info("FastAPI Cache initialized with Redis.")
+    except Exception as e:
+        logger.error(f"Failed to initialize FastAPI Cache: {e}")
+
     try:
         from app.models.base import Base
         from app.core.database import engine, async_session_factory

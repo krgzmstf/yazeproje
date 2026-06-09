@@ -8,6 +8,7 @@ import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
 import CookieConsent from "@/components/ui/CookieConsent";
 import AccessibilityMenu from "@/components/accessibility/AccessibilityMenu";
+import SplashScreen from "@/components/ui/SplashScreen";
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -94,6 +95,7 @@ export default async function RootLayout({
   return (
     <html lang="tr" className={`${playfair.variable} ${inter.variable}`}>
       <body className="font-inter antialiased">
+        <SplashScreen />
         <TopBar settings={settings} />
         <Header settings={settings} />
         <main className="min-h-screen">{children}</main>

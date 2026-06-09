@@ -9,6 +9,7 @@ from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.upload import router as upload_router
 from app.api.v1.endpoints.settings import router as settings_router
 from app.api.v1.endpoints.products import router as products_router
+from app.api.v1.endpoints.websockets import router as websocket_router
 
 api_router = APIRouter()
 
@@ -26,3 +27,4 @@ api_router.include_router(contact_router, tags=["Contact"])
 api_router.include_router(upload_router, prefix="/upload", tags=["Upload"])
 api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
 api_router.include_router(products_router, prefix="/software", tags=["Software Products"])
+api_router.include_router(websocket_router, tags=["WebSockets"])

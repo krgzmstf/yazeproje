@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from slugify import slugify
+from fastapi_cache.decorator import cache
 
 from app.core.database import get_db
 from app.models.content import AutomatedNews, Announcement, Event
@@ -23,6 +24,7 @@ allow_editor_or_admin = Depends(RoleChecker([UserRole.EDITOR, UserRole.ADMIN]))
 # ── Automated News ─────────────────────────────────────────────────
 
 @router.get("/news", response_model=list[AutomatedNewsResponse])
+@cache(expire=300)
 async def get_news(
     is_featured: bool | None = None,
     limit: int = Query(20, ge=1, le=100),
@@ -84,6 +86,7 @@ async def get_news_by_slug(
 # ── Announcements ───────────────────────────────────────────────────
 
 @router.get("/announcements", response_model=list[AnnouncementResponse])
+@cache(expire=300)
 async def get_announcements(
     is_pinned: bool | None = None,
     limit: int = Query(20, ge=1, le=100),
@@ -142,6 +145,7 @@ async def get_announcement_by_slug(
 # ── Events ──────────────────────────────────────────────────────────
 
 @router.get("/events", response_model=list[EventResponse])
+@cache(expire=300)
 async def get_events(
     is_featured: bool | None = None,
     limit: int = Query(20, ge=1, le=100),

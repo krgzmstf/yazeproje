@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from slugify import slugify
+from fastapi_cache.decorator import cache
 
 from app.core.database import get_db
 from app.models.real_estate import RealEstateListing, ListingType, PropertyType
@@ -14,6 +15,7 @@ allow_agent_or_admin = Depends(RoleChecker([UserRole.AGENT, UserRole.ADMIN]))
 
 
 @router.get("/", response_model=list[RealEstateListingResponse])
+@cache(expire=60)
 async def get_listings(
     listing_type: ListingType | None = None,
     property_type: PropertyType | None = None,

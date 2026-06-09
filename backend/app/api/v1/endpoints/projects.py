@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from slugify import slugify
+from fastapi_cache.decorator import cache
 
 from app.core.database import get_db
 from app.models.project import ArchitectureProject, ProjectCategory
@@ -14,6 +15,7 @@ allow_architect_or_admin = Depends(RoleChecker([UserRole.ARCHITECT, UserRole.ADM
 
 
 @router.get("/", response_model=list[ArchitectureProjectResponse])
+@cache(expire=300)
 async def get_projects(
     category: ProjectCategory | None = None,
     is_featured: bool | None = None,

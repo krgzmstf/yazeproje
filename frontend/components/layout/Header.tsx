@@ -102,12 +102,12 @@ export default function Header({ settings = {} }: HeaderProps) {
   const toggleMenu = () => setIsOpen(!isOpen);
 
   const headerBgClass = isHome
-    ? "absolute top-0 left-0 w-full z-40 bg-transparent border-b border-gold/15 text-cream select-none transition-all duration-300"
-    : "sticky top-0 z-40 bg-[#050508]/95 backdrop-blur-md border-b border-gold/20 text-cream select-none transition-all duration-300";
+    ? "absolute top-0 left-0 w-full z-40 bg-transparent border-b border-gold/10 text-cream select-none transition-all duration-300"
+    : "sticky top-0 z-40 bg-navy-dark/80 backdrop-blur-2xl border-b border-gold/10 text-cream select-none transition-all duration-300";
 
   const topBarBgClass = isHome
     ? "w-full bg-transparent border-b border-gold/10 px-6 lg:px-16 py-2.5 hidden sm:flex justify-between items-center text-xs text-cream/70 select-none"
-    : "w-full bg-[#030305] border-b border-gold/30 px-6 lg:px-16 py-2.5 hidden sm:flex justify-between items-center text-xs text-cream/70 select-none";
+    : "w-full bg-navy-dark/40 border-b border-gold/10 px-6 lg:px-16 py-2.5 hidden sm:flex justify-between items-center text-xs text-cream/70 select-none";
 
   return (
     <header className={headerBgClass}>

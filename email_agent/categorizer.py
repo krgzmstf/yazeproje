@@ -2,7 +2,17 @@
 
 from __future__ import annotations
 import re
+import os
 from dataclasses import dataclass
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Gemini Config
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 # ── Kategoriler ───────────────────────────────────────────────────────────────
@@ -179,8 +189,23 @@ def _needs_reply(text: str, category: str) -> bool:
 
 
 def _make_summary(subject: str, snippet: str) -> str:
-    combined = f"{subject}. {snippet}".strip(". ")
-    return combined[:200] if len(combined) > 200 else combined
+    if not GEMINI_API_KEY:
+        combined = f"{subject}. {snippet}".strip(". ")
+        return combined[:200] if len(combined) > 200 else combined
+
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = (
+            f"Aşağıdaki e-posta konusu ve içeriğinden çok kısa (en fazla 15 kelime), "
+            f"anlaşılır bir Türkçe özet çıkar:\n\n"
+            f"Konu: {subject}\n"
+            f"İçerik: {snippet}"
+        )
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception:
+        combined = f"{subject}. {snippet}".strip(". ")
+        return combined[:200] if len(combined) > 200 else combined
 
 
 def _extract_tags(text: str, category: str) -> list[str]:

@@ -111,17 +111,24 @@ export default function MapSearch({ listings, onBoundsChange }: MapSearchProps) 
         // Custom Premium Popup
         const typeLabel = item.listing_type === "sale" ? "Satılık" : "Kiralık";
         const popupContent = `
-          <div style="font-family: sans-serif; width: 220px; color: #1e293b; padding: 4px;">
-            <img src="${item.cover_image_url || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80'}" 
-                 style="width: 100%; height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 8px;" />
-            <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: bold; color: #0f172a; line-height: 1.4;">${item.title}</h4>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-              <span style="font-size: 10px; font-weight: bold; text-transform: uppercase; background: #fef08a; color: #854d0e; padding: 2px 6px; border-radius: 4px;">
+          <div style="font-family: 'Inter', sans-serif; width: 240px; color: #1a1a1a; padding: 0; overflow: hidden; border-radius: 12px; background: #FAF7F2;">
+            <div style="position: relative; height: 130px; overflow: hidden;">
+              <img src="${item.cover_image_url || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=400&q=80'}" 
+                   style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease;" />
+              <div style="position: absolute; top: 8px; left: 8px; background: #C9A961; color: #050F26; font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
                 ${typeLabel}
-              </span>
-              <a href="/listings/${item.slug}" style="font-size: 11px; color: #854d0e; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center;">
-                Detaya Git &rarr;
-              </a>
+              </div>
+            </div>
+            <div style="padding: 12px;">
+              <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 700; color: #0A1F44; line-height: 1.3;">${item.title}</h4>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid rgba(10,31,68,0.05); pt: 8px;">
+                <span style="font-size: 13px; font-weight: 700; color: #8B7339;">
+                  ${priceLabel}
+                </span>
+                <a href="/listings/${item.slug}" style="font-size: 11px; color: #0A1F44; font-weight: 800; text-decoration: none; border: 1px solid #C9A961; padding: 4px 10px; border-radius: 20px; transition: all 0.3s ease;">
+                  İncele &rarr;
+                </a>
+              </div>
             </div>
           </div>
         `;

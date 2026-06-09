@@ -17,7 +17,8 @@ passlib[bcrypt]==1.7.4
 python-multipart==0.0.20
 
 # ── Redis ────────────────────────────────────────────────────────
-redis[hiredis]==5.2.1
+redis==4.6.0
+fastapi-cache2[redis]==0.2.1
 
 # ── HTTP / Scraping ──────────────────────────────────────────────
 httpx==0.28.1

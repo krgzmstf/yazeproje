@@ -16,7 +16,7 @@ export default function TopBar({ settings = {} }: TopBarProps) {
   const mailLink = `mailto:${email}`;
 
   return (
-    <div className="bg-navy-dark text-cream/80 border-b border-gold/20 text-xs py-2 px-4 md:px-8 hidden md:block select-none">
+    <div className="bg-navy-dark/95 backdrop-blur-sm text-cream/80 border-b border-gold/10 text-xs py-2.5 px-4 md:px-8 hidden md:block select-none">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         {/* Contact Info */}
         <div className="flex items-center space-x-6">

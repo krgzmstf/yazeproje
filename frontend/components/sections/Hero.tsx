@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+} from "framer-motion";
 import { ArrowRight, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import Link from "next/link";
 import { ArchitectureProject } from "@/lib/api";
@@ -12,19 +17,31 @@ interface HeroProps {
 }
 
 export default function Hero({ projects, settings = {} }: HeroProps) {
+  const { scrollY } = useScroll();
+  const yBg = useTransform(scrollY, [0, 800], [0, 150]);
+  const opacityText = useTransform(scrollY, [0, 300], [1, 0]);
+  const scaleText = useTransform(scrollY, [0, 300], [1, 0.95]);
+
   const defaultSlides = [
     {
-      image: settings.hero_bg_image || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
+      image:
+        settings.hero_bg_image ||
+        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=80",
       title: settings.hero_title || "Estetik Mimarlık & Güçlü Mühendislik",
-      subtitle: settings.site_title ? `${settings.site_title} MİMARLIK` : "YAZE PROJE MİMARLIK",
-      desc: settings.hero_subtitle || "Ankara Gölbaşı merkezli, modern çizgileri sürdürülebilir yaşam alanlarıyla buluşturuyoruz. Arsa geliştirme ve bina projelerinizde profesyonel çözüm ortağınız.",
+      subtitle: settings.site_title
+        ? `${settings.site_title} MİMARLIK`
+        : "YAZE PROJE MİMARLIK",
+      desc:
+        settings.hero_subtitle ||
+        "Ankara Gölbaşı merkezli, modern çizgileri sürdürülebilir yaşam alanlarıyla buluşturuyoruz. Arsa geliştirme ve bina projelerinizde profesyonel çözüm ortağınız.",
       btnPrimary: settings.hero_cta_text_1 || "Projelerimiz",
       btnPrimaryLink: settings.hero_cta_link_1 || "/projects",
       btnSecondary: settings.hero_cta_text_2 || "Teklif Al",
       btnSecondaryLink: settings.hero_cta_link_2 || "/contact",
     },
     {
-      image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
+      image:
+        "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1920&q=80",
       title: "Akıllı Yatırımlarla Geleceğinizi Şekillendirin",
       subtitle: "GAYRİMENKUL & TEKNOLOJİ",
       desc: "Yapay zeka tabanlı veri analiz yazılımlarımızla anlık piyasa takibi yapıyor, Gölbaşı bölgesindeki en karlı arsa ve gayrimenkul yatırım fırsatlarını sizlere sunuyoruz.",
@@ -35,21 +52,26 @@ export default function Hero({ projects, settings = {} }: HeroProps) {
     },
   ];
 
-  const slides = projects && projects.length > 0
-    ? [
-        ...defaultSlides,
-        ...projects.slice(0, 2).map((proj) => ({
-          image: proj.cover_image_url || defaultSlides[0].image,
-          title: proj.title,
-          subtitle: `PROJE / ${proj.category.toUpperCase()}`,
-          desc: proj.description ? (proj.description.length > 180 ? proj.description.substring(0, 180) + "..." : proj.description) : "",
-          btnPrimary: "Projeyi İncele",
-          btnPrimaryLink: `/projects/${proj.slug}`,
-          btnSecondary: "Tüm Projeler",
-          btnSecondaryLink: "/projects",
-        }))
-      ]
-    : defaultSlides;
+  const slides =
+    projects && projects.length > 0
+      ? [
+          ...defaultSlides,
+          ...projects.slice(0, 2).map((proj) => ({
+            image: proj.cover_image_url || defaultSlides[0].image,
+            title: proj.title,
+            subtitle: `PROJE / ${proj.category.toUpperCase()}`,
+            desc: proj.description
+              ? proj.description.length > 180
+                ? proj.description.substring(0, 180) + "..."
+                : proj.description
+              : "",
+            btnPrimary: "Projeyi İncele",
+            btnPrimaryLink: `/projects/${proj.slug}`,
+            btnSecondary: "Tüm Projeler",
+            btnSecondaryLink: "/projects",
+          })),
+        ]
+      : defaultSlides;
 
   const [current, setCurrent] = useState(0);
 
@@ -71,30 +93,38 @@ export default function Hero({ projects, settings = {} }: HeroProps) {
   return (
     <div className="relative h-[85vh] min-h-[600px] w-full overflow-hidden bg-navy-dark select-none">
       {/* Background Slideshow with Zoom effect */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={current}
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={{ opacity: 1, scale: 1.0 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 1.5, ease: "easeInOut" }}
-          className="absolute inset-0 w-full h-full"
-        >
-          {/* Cover image */}
-          <div
-            className="w-full h-full bg-cover bg-center"
-            style={{ backgroundImage: `url(${slides[current].image})` }}
-          />
-          {/* Elegant Dark Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-navy-dark/90 via-navy-dark/70 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-navy-dark via-transparent to-transparent opacity-80" />
-        </motion.div>
-      </AnimatePresence>
+      <motion.div
+        style={{ y: yBg }}
+        className="absolute inset-0 w-full h-[120%]"
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={current}
+            initial={{ opacity: 0, scale: 1.1 }}
+            animate={{ opacity: 1, scale: 1.0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 1.5, ease: "easeInOut" }}
+            className="absolute inset-0 w-full h-full"
+          >
+            {/* Cover image */}
+            <div
+              className="w-full h-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${slides[current].image})` }}
+            />
+            {/* Elegant Dark Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-navy-dark/90 via-navy-dark/70 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-navy-dark via-transparent to-transparent opacity-80" />
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
 
       {/* Slide Content */}
       <div className="absolute inset-0 flex items-center z-10">
         <div className="max-w-7xl mx-auto px-4 md:px-8 w-full">
-          <div className="max-w-2xl text-cream">
+          <motion.div
+            style={{ opacity: opacityText, scale: scaleText }}
+            className="max-w-2xl text-cream"
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={current}
@@ -110,12 +140,14 @@ export default function Hero({ projects, settings = {} }: HeroProps) {
 
                 {/* Title */}
                 <h1 className="font-playfair text-4xl md:text-6xl font-bold leading-tight tracking-wide mb-6">
-                  {(slides[current].title as string).split(" & ").map((text: string, i: number) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <span className="text-gold"> & </span>}
-                      {text}
-                    </React.Fragment>
-                  ))}
+                  {(slides[current].title as string)
+                    .split(" & ")
+                    .map((text: string, i: number) => (
+                      <React.Fragment key={i}>
+                        {i > 0 && <span className="text-gold"> & </span>}
+                        {text}
+                      </React.Fragment>
+                    ))}
                 </h1>
 
                 {/* Description */}
@@ -142,7 +174,7 @@ export default function Hero({ projects, settings = {} }: HeroProps) {
                 </div>
               </motion.div>
             </AnimatePresence>
-          </div>
+          </motion.div>
         </div>
       </div>
 
