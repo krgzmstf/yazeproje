@@ -43,6 +43,19 @@ services:
     entrypoint: ["echo", "Frontend is hosted on Vercel"]
     restart: "no"
 
+  lead-system:
+    image: python:3.11-slim
+    container_name: yaze-lead-system
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - /app/lead-system:/app
+    command: sh -c "pip install -r requirements.txt -q && python app.py"
+    environment:
+      FLASK_ENV: production
+    networks:
+      - yaze-network
+
   nginx:
     ports:
       - "80:80"
@@ -51,8 +64,10 @@ services:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - certbot_webroot:/var/www/certbot:ro
+      - backend_uploads:/app/uploads:ro
     depends_on:
       - backend
+      - lead-system
     restart: always
 
   # ── Certbot (Let's Encrypt) ────────────────────────────────

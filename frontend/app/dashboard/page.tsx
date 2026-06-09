@@ -3,13 +3,14 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import SosyalMedyaPanel from "@/components/dashboard/SosyalMedyaPanel";
 import {
   Building2, Home, Newspaper, LayoutDashboard, Plus, Trash2, Edit, LogOut,
   User, Users, ShieldCheck, ShieldAlert, RefreshCw, MapPin, Search, ArrowUpDown, ChevronRight,
   TrendingUp, Activity, CheckCircle2, Clock, Eye, EyeOff, Phone, Lock, AlertCircle, Laptop, Mail,
   FileText, Calculator, BookOpen, Layers, Link as LinkIcon, Download,
   Image as ImageIcon, Info, HelpCircle, ArrowUp, ArrowDown,
-  MessageSquare, Upload, ChevronDown, CheckCheck, XCircle, Flag
+  MessageSquare, Upload, ChevronDown, CheckCheck, XCircle, Flag, Target
 } from "lucide-react";
 import PasswordStrengthMeter from "@/components/ui/PasswordStrengthMeter";
 import {
@@ -38,10 +39,18 @@ const getApiBaseUrl = () => {
     if (window.location.hostname.includes("yazeproje.com")) {
       return "https://api.yazeproje.com/api/v1";
     }
-    // Lokalde nginx üzerinden git (port 1000) — aynı origin, CORS sorunu yok
     return `${window.location.protocol}//${window.location.hostname}:1000/api/v1`;
   }
   return process.env.NEXT_PUBLIC_API_URL || "http://localhost:1000/api/v1";
+};
+
+const getLeadSystemUrl = (page = "") => {
+  if (typeof window !== "undefined") {
+    if (window.location.hostname.includes("yazeproje.com")) {
+      return `https://api.yazeproje.com/lead-system/${page}`;
+    }
+  }
+  return `http://localhost:5002/${page}`;
 };
 
 export default function DashboardPage() {
@@ -652,36 +661,68 @@ export default function DashboardPage() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const isGalleryType = modalType === "project" || modalType === "listing";
+    const files = isGalleryType
+      ? Array.from(e.target.files || [])
+      : [e.target.files?.[0]].filter(Boolean) as File[];
+    if (!files.length) return;
 
     setUploading(true);
-    const uploadData = new FormData();
-    uploadData.append("file", file);
+    const apiBase = getApiBaseUrl();
 
-    try {
-      const apiBase = getApiBaseUrl();
-      const res = await fetch(`${apiBase}/upload/image`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: uploadData,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || "Yükleme başarısız.");
+    if (isGalleryType) {
+      // Galeri modunda: tüm seçilen dosyaları galeriye ekle (max 10)
+      const remaining = 10 - galleryImages.length;
+      if (remaining <= 0) { alert("En fazla 10 görsel yükleyebilirsiniz."); setUploading(false); return; }
+      const toUpload = files.slice(0, remaining);
+      const uploaded: string[] = [];
+      for (const file of toUpload) {
+        const fd = new FormData();
+        fd.append("file", file);
+        try {
+          const res = await fetch(`${apiBase}/upload/image`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            uploaded.push(`${apiBase}/uploads/${data.filename}`);
+          } else {
+            const err = await res.json();
+            alert(`${file.name} yüklenemedi: ${err.detail || "Hata"}`);
+          }
+        } catch { alert(`${file.name} yüklenirken bağlantı hatası.`); }
       }
-
-      const data = await res.json();
-      setFormData((prev: any) => ({ ...prev, cover_image_url: data.url }));
-      alert("Görsel başarıyla yüklendi ve optimize edildi.");
-    } catch (err: any) {
-      alert(err.message || "Görsel yüklenirken bir hata oluştu.");
-    } finally {
-      setUploading(false);
+      if (uploaded.length > 0) {
+        setGalleryImages((prev) => [...prev, ...uploaded].slice(0, 10));
+        if (!formData.cover_image_url) {
+          setFormData((fd: any) => ({ ...fd, cover_image_url: uploaded[0] }));
+        }
+      }
+    } else {
+      // Tek kapak görseli (haber, duyuru, etkinlik, yazılım)
+      const uploadData = new FormData();
+      uploadData.append("file", files[0]);
+      try {
+        const res = await fetch(`${apiBase}/upload/image`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: uploadData,
+        });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.detail || "Yükleme başarısız.");
+        }
+        const data = await res.json();
+        setFormData((prev: any) => ({ ...prev, cover_image_url: `${apiBase}/uploads/${data.filename}` }));
+      } catch (err: any) {
+        alert(err.message || "Görsel yüklenirken bir hata oluştu.");
+      }
     }
+
+    e.target.value = "";
+    setUploading(false);
   };
 
   const handleGalleryImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -704,21 +745,19 @@ export default function DashboardPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          uploaded.push(data.url);
+          uploaded.push(`${apiBase}/uploads/${data.filename}`);
         } else {
           const err = await res.json();
           alert(`${file.name} yüklenemedi: ${err.detail || "Hata"}`);
         }
       } catch { alert(`${file.name} yüklenirken bağlantı hatası.`); }
     }
-    setGalleryImages((prev) => {
-      const next = [...prev, ...uploaded].slice(0, 10);
-      // İlk resim vitrin olarak otomatik seçilsin (eğer henüz vitrin yoksa)
-      if (!formData.cover_image_url && next.length > 0) {
-        setFormData((fd: any) => ({ ...fd, cover_image_url: next[0] }));
+    if (uploaded.length > 0) {
+      setGalleryImages((prev) => [...prev, ...uploaded].slice(0, 10));
+      if (!formData.cover_image_url) {
+        setFormData((fd: any) => ({ ...fd, cover_image_url: uploaded[0] }));
       }
-      return next;
-    });
+    }
     e.target.value = "";
     setGalleryUploading(false);
   };
@@ -762,6 +801,7 @@ export default function DashboardPage() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [activeSettingsGroup, setActiveSettingsGroup] = useState("general");
+  const [aprtmailSubTab, setAprtmailSubTab] = useState<"sosyalmedya" | "lead">("sosyalmedya");
 
   const fetchSettings = async (authToken: string) => {
     setSettingsLoading(true);
@@ -1084,8 +1124,8 @@ export default function DashboardPage() {
   const openEditModal = (type: "project" | "listing" | "news" | "software" | "announcement" | "event", item: any) => {
     setModalType(type);
     setEditId(item.id);
-    // Proje gallery'sini yükle
-    if (type === "project") {
+    // Proje ve listing gallery'sini yükle
+    if (type === "project" || type === "listing") {
       const imgs: string[] = item.gallery_urls?.images || [];
       setGalleryImages(imgs);
     } else {
@@ -1135,8 +1175,8 @@ export default function DashboardPage() {
         ? `${apiBase}/${path}/${editId}` 
         : `${apiBase}/${path}${hasNoTrailingSlash ? "" : "/"}`;
 
-      // Proje için gallery_urls'yi ekle
-      const body = modalType === "project"
+      // Proje ve listing için gallery_urls'yi ekle
+      const body = (modalType === "project" || modalType === "listing")
         ? { ...formData, gallery_urls: galleryImages.length > 0 ? { images: galleryImages } : null }
         : formData;
 
@@ -1362,6 +1402,19 @@ export default function DashboardPage() {
                     <span>Site Ayarları (CMS)</span>
                   </div>
                   <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "settings" ? "text-navy-dark" : "text-gold"}`} />
+                </button>
+
+                <button
+                  onClick={() => { setActiveTab("aprtmail"); setSearchQuery(""); }}
+                  className={`w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200 group ${
+                    activeTab === "aprtmail" ? "bg-gold text-navy-dark shadow-md" : "text-cream/70 hover:bg-navy-dark hover:text-gold"
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Mail className="w-4 h-4" />
+                    <span>Aprt Mail</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity ${activeTab === "aprtmail" ? "text-navy-dark" : "text-gold"}`} />
                 </button>
               </>
             )}
@@ -2229,6 +2282,102 @@ export default function DashboardPage() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Tab: Lead Sistemi (sadece admin) ──────────────────────── */}
+            {activeTab === "leads" && user.role === "admin" && (
+              <div className="space-y-4 animate-fade-in-up">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-5">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">Lead Sistemi</h2>
+                    <p className="text-xs text-cream/50 mt-1">Google Maps tarama → e-posta bulma → AI taslak → gönderim</p>
+                  </div>
+                  <a
+                    href={getLeadSystemUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg text-xs font-bold transition-all"
+                  >
+                    <Target className="w-3.5 h-3.5" />
+                    Tam Ekranda Aç
+                  </a>
+                </div>
+                <div className="rounded-xl overflow-hidden border border-gold/15 shadow-xl bg-navy-dark" style={{ height: "78vh" }}>
+                  <iframe
+                    src={getLeadSystemUrl()}
+                    className="w-full h-full border-0"
+                    title="Lead Sistemi"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Tab: Aprt Mail (sadece admin) ───────────────────────── */}
+            {activeTab === "aprtmail" && user.role === "admin" && (
+              <div className="flex flex-col animate-fade-in-up" style={{ height: "calc(100vh - 120px)" }}>
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gold/10 pb-4 mb-4 shrink-0">
+                  <div>
+                    <h2 className="font-playfair text-2xl font-bold text-cream">Aprt Mail</h2>
+                    <p className="text-xs text-cream/50 mt-1">Sosyal medya & apartman firmalarına otomatik mail yönetimi</p>
+                  </div>
+                  {aprtmailSubTab === "lead" && (
+                    <a
+                      href={getLeadSystemUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg text-xs font-bold transition-all"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Tam Ekranda Aç
+                    </a>
+                  )}
+                </div>
+
+                {/* Alt Sekmeler */}
+                <div className="flex gap-2 mb-4 shrink-0">
+                  <button
+                    onClick={() => setAprtmailSubTab("sosyalmedya")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      aprtmailSubTab === "sosyalmedya"
+                        ? "bg-gold/15 text-gold border border-gold/30"
+                        : "text-cream/60 hover:text-cream border border-transparent hover:bg-navy-dark"
+                    }`}
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    Sosyal Medya
+                  </button>
+                  <button
+                    onClick={() => setAprtmailSubTab("lead")}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      aprtmailSubTab === "lead"
+                        ? "bg-gold/15 text-gold border border-gold/30"
+                        : "text-cream/60 hover:text-cream border border-transparent hover:bg-navy-dark"
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    Lead Sistemi
+                  </button>
+                </div>
+
+                {/* İçerik */}
+                <div className="flex-1 overflow-hidden">
+                  {aprtmailSubTab === "sosyalmedya" && (
+                    <div className="h-full overflow-y-auto">
+                      <SosyalMedyaPanel />
+                    </div>
+                  )}
+                  {aprtmailSubTab === "lead" && (
+                    <div className="rounded-xl overflow-hidden border border-gold/15 shadow-xl bg-navy-dark h-full">
+                      <iframe
+                        src={getLeadSystemUrl()}
+                        className="w-full h-full border-0"
+                        title="Lead Sistemi"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -3776,6 +3925,7 @@ export default function DashboardPage() {
                         onChange={handleImageUpload}
                         className="hidden"
                         disabled={uploading}
+                        multiple={modalType === "project" || modalType === "listing"}
                       />
                     </label>
                   </div>
@@ -4108,7 +4258,7 @@ export default function DashboardPage() {
 
                   {/* Interactive Map Selector Integration */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-5 bg-navy-dark/45 p-5 rounded-xl border border-gold/15 shadow-inner">
-                    
+
                     {/* Left inputs */}
                     <div className="md:col-span-4 space-y-4 self-center">
                       <span className="text-[10px] font-bold text-gold uppercase tracking-wider block">Harita Koordinatları</span>
@@ -4136,13 +4286,100 @@ export default function DashboardPage() {
 
                     {/* Right Mini-map */}
                     <div className="md:col-span-8 h-[240px]">
-                      <MapSelector 
-                        lat={formData.latitude || 39.7925} 
-                        lng={formData.longitude || 32.8130} 
+                      <MapSelector
+                        lat={formData.latitude || 39.7925}
+                        lng={formData.longitude || 32.8130}
                         onChange={(lat, lng) => setFormData({ ...formData, latitude: lat, longitude: lng })}
                       />
                     </div>
 
+                  </div>
+
+                  {/* İLAN GALERİSİ — en fazla 10 görsel, vitrin seçimi */}
+                  <div className="bg-navy-dark/50 border border-gold/15 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] uppercase font-bold text-gold/80 tracking-wider">
+                        İlan Galerisi — Vitrin Seçimi ({galleryImages.length}/10)
+                      </label>
+                      {galleryImages.length < 10 && (
+                        <label className="flex items-center gap-1.5 px-3 py-1.5 bg-gold/10 hover:bg-gold hover:text-navy-dark text-gold border border-gold/25 rounded-lg cursor-pointer font-bold transition-all text-[10px] select-none">
+                          {galleryUploading ? (
+                            <><RefreshCw className="w-3 h-3 animate-spin" /> Yükleniyor...</>
+                          ) : (
+                            <><Upload className="w-3 h-3" /> Görsel Ekle</>
+                          )}
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                            multiple
+                            onChange={handleGalleryImageUpload}
+                            className="hidden"
+                            disabled={galleryUploading}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {galleryImages.length === 0 ? (
+                      <div className="border border-dashed border-gold/20 rounded-lg p-6 text-center text-[10px] text-cream/35">
+                        Henüz görsel eklenmedi. Yukarıdaki butonu kullanarak JPG/PNG/WebP yükleyin.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                        {galleryImages.map((img, idx) => {
+                          const isVitrin = img === formData.cover_image_url;
+                          return (
+                            <div key={idx} className={`relative group rounded-lg overflow-hidden border-2 transition-all ${isVitrin ? "border-gold shadow-md shadow-gold/20" : "border-gold/10 hover:border-gold/40"}`}>
+                              <img src={img} alt={`Görsel ${idx + 1}`} className="w-full aspect-square object-cover" />
+                              {isVitrin && (
+                                <div className="absolute top-1 left-1 bg-gold text-navy-dark text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                  ★ Vitrin
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                                {!isVitrin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setFormData((fd: any) => ({ ...fd, cover_image_url: img }))}
+                                    className="w-full py-1 bg-gold text-navy-dark text-[9px] font-bold rounded hover:bg-gold-light transition-colors"
+                                  >
+                                    ★ Vitrin Yap
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = galleryImages.filter((_, i) => i !== idx);
+                                    setGalleryImages(next);
+                                    if (isVitrin) {
+                                      setFormData((fd: any) => ({ ...fd, cover_image_url: next[0] || "" }));
+                                    }
+                                  }}
+                                  className="w-full py-1 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-500 transition-colors"
+                                >
+                                  Kaldır
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {galleryImages.length < 10 && (
+                          <label className="relative rounded-lg border-2 border-dashed border-gold/20 hover:border-gold/50 cursor-pointer transition-all aspect-square flex flex-col items-center justify-center text-cream/30 hover:text-gold transition-colors">
+                            <span className="text-2xl font-light">+</span>
+                            <span className="text-[9px] mt-0.5">{10 - galleryImages.length} boş</span>
+                            <input
+                              type="file"
+                              accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,image/*"
+                              multiple
+                              onChange={handleGalleryImageUpload}
+                              className="hidden"
+                              disabled={galleryUploading}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[9px] text-cream/35">Üzerine gelip "Vitrin Yap"a tıklayarak kapak fotoğrafını seçin. İlk yüklenen otomatik vitrin olur.</p>
                   </div>
 
                 </div>
