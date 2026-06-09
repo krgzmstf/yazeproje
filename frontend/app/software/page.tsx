@@ -1,6 +1,14 @@
 import React from "react";
 import Link from "next/link";
-import { Download, ExternalLink, HelpCircle, Laptop, Cpu, Layers, CheckCircle } from "lucide-react";
+import {
+  Download,
+  ExternalLink,
+  HelpCircle,
+  Laptop,
+  Cpu,
+  Layers,
+  CheckCircle,
+} from "lucide-react";
 import { getSoftwareProducts, SoftwareProduct } from "@/lib/api";
 
 // Fallback products in case backend isn't loaded or fails
@@ -11,7 +19,8 @@ const fallbackProducts: SoftwareProduct[] = [
     slug: "yazesym",
     category: "calculation",
     short_description: "Mühendislik yapısal analiz ve simülasyon yazılımı.",
-    description: "YazeSYM, inşaat ve yapı mühendisleri için geliştirilmiş, deprem yükleri ve yapısal analizleri uluslararası yönetmeliklere uygun olarak gerçekleştiren gelişmiş bir simülasyon aracıdır.",
+    description:
+      "YazeSYM, inşaat ve yapı mühendisleri için geliştirilmiş, deprem yükleri ve yapısal analizleri uluslararası yönetmeliklere uygun olarak gerçekleştiren gelişmiş bir simülasyon aracıdır.",
     price: 15000,
     currency: "TRY",
     is_free: false,
@@ -21,19 +30,21 @@ const fallbackProducts: SoftwareProduct[] = [
     sort_order: 1,
     download_url: null,
     demo_url: "https://yazesym.yazeproje.com",
-    cover_image_url: "https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80",
+    cover_image_url: "/images/yazesym-screenshot.png",
     screenshots: null,
     features: null,
     created_at: "",
-    updated_at: ""
+    updated_at: "",
   },
   {
     id: "f2",
     name: "yaze_metraj",
     slug: "yaze-metraj",
     category: "calculation",
-    short_description: "Hızlı metraj çıkartma ve yaklaşık maliyet hesaplama aracı.",
-    description: "yaze_metraj, projelerinizdeki beton, demir, kalıp ve diğer tüm yapı elemanlarının metrajlarını CAD çizimleri üzerinden otomatik çıkartarak yaklaşık maliyet hesaplama süreçlerinizi dakikalar içerisine indirger.",
+    short_description:
+      "Hızlı metraj çıkartma ve yaklaşık maliyet hesaplama aracı.",
+    description:
+      "yaze_metraj, projelerinizdeki beton, demir, kalıp ve diğer tüm yapı elemanlarının metrajlarını CAD çizimleri üzerinden otomatik çıkartarak yaklaşık maliyet hesaplama süreçlerinizi dakikalar içerisine indirger.",
     price: 8500,
     currency: "TRY",
     is_free: false,
@@ -43,19 +54,22 @@ const fallbackProducts: SoftwareProduct[] = [
     sort_order: 2,
     download_url: null,
     demo_url: "https://metraj.yazeproje.com",
-    cover_image_url: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80",
+    cover_image_url:
+      "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=800&q=80",
     screenshots: null,
     features: null,
     created_at: "",
-    updated_at: ""
+    updated_at: "",
   },
   {
     id: "f3",
     name: "Ynot",
     slug: "ynot",
     category: "project_management",
-    short_description: "Mimar ve mühendisler için akıllı not alma ve şantiye takip uygulaması.",
-    description: "Ynot, şantiyede ve ofiste ekip içi iletişimi koordine eden, anlık not alma, görev atama ve şantiye fotoğraf/doküman arşivleme özelliklerine sahip akıllı proje yönetim platformudur.",
+    short_description:
+      "Mimar ve mühendisler için akıllı not alma ve şantiye takip uygulaması.",
+    description:
+      "Ynot, şantiyede ve ofiste ekip içi iletişimi koordine eden, anlık not alma, görev atama ve şantiye fotoğraf/doküman arşivleme özelliklerine sahip akıllı proje yönetim platformudur.",
     price: 0,
     currency: "TRY",
     is_free: true,
@@ -65,19 +79,22 @@ const fallbackProducts: SoftwareProduct[] = [
     sort_order: 3,
     download_url: null,
     demo_url: "https://not.yazeproje.com",
-    cover_image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
+    cover_image_url:
+      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80",
     screenshots: null,
     features: null,
     created_at: "",
-    updated_at: ""
+    updated_at: "",
   },
   {
     id: "f4",
     name: "yaze otel",
     slug: "yaze-otel",
     category: "other",
-    short_description: "Modern otel, rezidans ve konaklama işletim otomasyon sistemi.",
-    description: "yaze otel, konuk giriş-çıkış takibi, oda rezervasyon yönetimi, faturalandırma ve temizlik koordinasyonunu tek ekrandan sunan, bulut tabanlı modern bir otel otomasyon çözümüdür.",
+    short_description:
+      "Modern otel, rezidans ve konaklama işletim otomasyon sistemi.",
+    description:
+      "yaze otel, konuk giriş-çıkış takibi, oda rezervasyon yönetimi, faturalandırma ve temizlik koordinasyonunu tek ekrandan sunan, bulut tabanlı modern bir otel otomasyon çözümüdür.",
     price: 12000,
     currency: "TRY",
     is_free: false,
@@ -87,12 +104,13 @@ const fallbackProducts: SoftwareProduct[] = [
     sort_order: 4,
     download_url: null,
     demo_url: "https://otel.yazeproje.com",
-    cover_image_url: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
+    cover_image_url:
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80",
     screenshots: null,
     features: null,
     created_at: "",
-    updated_at: ""
-  }
+    updated_at: "",
+  },
 ];
 
 const categoryLabels: Record<string, string> = {
@@ -101,7 +119,7 @@ const categoryLabels: Record<string, string> = {
   bim: "BIM Modelleme",
   calculation: "Hesaplama & Metraj",
   visualization: "Görselleştirme",
-  other: "Otomasyon & SaaS"
+  other: "Otomasyon & SaaS",
 };
 
 export default async function SoftwarePage() {
@@ -109,7 +127,10 @@ export default async function SoftwarePage() {
   try {
     products = await getSoftwareProducts();
   } catch (error) {
-    console.error("Failed to load software products. Using fallback data.", error);
+    console.error(
+      "Failed to load software products. Using fallback data.",
+      error,
+    );
     products = fallbackProducts;
   }
 
@@ -121,7 +142,6 @@ export default async function SoftwarePage() {
   return (
     <div className="bg-navy-dark min-h-screen text-cream select-none pt-12 pb-24 font-sans">
       <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-16">
-        
         {/* Banner Section */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <span className="text-[10px] font-bold text-gold uppercase tracking-[0.2em] block">
@@ -132,8 +152,9 @@ export default async function SoftwarePage() {
           </h1>
           <div className="w-16 h-0.5 bg-gold mx-auto my-4" />
           <p className="text-xs md:text-sm text-cream/70 leading-relaxed font-light">
-            Emlak, mimarlık ve yapı sektörü için geliştirdiğimiz pratik ve yenilikçi masaüstü yazılımları, 
-            hesaplama araçları ve SaaS platformlarımızı tek bir çatı altında inceleyin ve indirin.
+            Emlak, mimarlık ve yapı sektörü için geliştirdiğimiz pratik ve
+            yenilikçi masaüstü yazılımları, hesaplama araçları ve SaaS
+            platformlarımızı tek bir çatı altında inceleyin ve indirin.
           </p>
         </div>
 
@@ -142,22 +163,24 @@ export default async function SoftwarePage() {
           {products.map((product) => {
             const hasDownload = !!product.download_url;
             return (
-              <div 
+              <div
                 key={product.id}
                 className="bg-navy border border-gold/15 hover:border-gold/30 rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col justify-between group"
               >
-                
                 {/* Upper Half */}
                 <div>
                   {/* Image banner */}
                   <div className="relative h-56 bg-navy-dark overflow-hidden border-b border-gold/10">
-                    <img 
-                      src={product.cover_image_url || "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80"}
+                    <img
+                      src={
+                        product.cover_image_url ||
+                        "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80"
+                      }
                       alt={product.name}
                       className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-700 opacity-90"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-navy to-transparent opacity-80" />
-                    
+
                     {/* Category and Version Badges */}
                     <div className="absolute top-4 left-4 flex gap-2">
                       <span className="px-3 py-1 bg-navy/85 backdrop-blur-sm border border-gold/25 rounded-full text-[9px] font-bold text-gold uppercase tracking-wider">
@@ -172,9 +195,13 @@ export default async function SoftwarePage() {
 
                     {/* Price Tag */}
                     <div className="absolute bottom-4 right-4 bg-navy-dark/90 backdrop-blur border border-gold/10 px-4 py-1.5 rounded-lg shadow-lg">
-                      <span className="text-[9px] uppercase tracking-wider text-cream/45 block">LİSANS BEDELİ</span>
+                      <span className="text-[9px] uppercase tracking-wider text-cream/45 block">
+                        LİSANS BEDELİ
+                      </span>
                       <span className="text-xs font-bold text-gold">
-                        {product.is_free ? "ÜCRETSİZ" : `${product.price?.toLocaleString("tr-TR")} ${product.currency}`}
+                        {product.is_free
+                          ? "ÜCRETSİZ"
+                          : `${product.price?.toLocaleString("tr-TR")} ${product.currency}`}
                       </span>
                     </div>
                   </div>
@@ -186,7 +213,7 @@ export default async function SoftwarePage() {
                         {product.name}
                       </h2>
                     </div>
-                    
+
                     <p className="text-xs text-cream/70 leading-relaxed font-light">
                       {product.description || product.short_description}
                     </p>
@@ -246,9 +273,7 @@ export default async function SoftwarePage() {
                       </Link>
                     )}
                   </div>
-
                 </div>
-
               </div>
             );
           })}
@@ -258,9 +283,13 @@ export default async function SoftwarePage() {
         <div className="bg-navy border border-gold/10 rounded-2xl p-8 max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-gold/5 rounded-full blur-2xl" />
           <div className="space-y-1.5 text-center md:text-left">
-            <h4 className="font-playfair font-bold text-gold text-sm tracking-wider uppercase">Özel Yazılım Talepleri</h4>
+            <h4 className="font-playfair font-bold text-gold text-sm tracking-wider uppercase">
+              Özel Yazılım Talepleri
+            </h4>
             <p className="text-xs text-cream/70 leading-relaxed font-light">
-              Şirketinize veya projelerinize özel otomasyon, veri toplama robotu veya CAD eklenti geliştirme talepleriniz için ekibimizle iletişime geçebilirsiniz.
+              Şirketinize veya projelerinize özel otomasyon, veri toplama robotu
+              veya CAD eklenti geliştirme talepleriniz için ekibimizle iletişime
+              geçebilirsiniz.
             </p>
           </div>
           <Link
@@ -270,7 +299,6 @@ export default async function SoftwarePage() {
             Bize Yazın
           </Link>
         </div>
-
       </div>
     </div>
   );
