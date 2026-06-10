@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     # ── Logging ──────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
 
+    # ── AI / GitHub Models ───────────────────────────────────────
+    GITHUB_TOKEN: str = ""
+    AI_MODEL: str = "openai/gpt-4.1"
+    AI_ENDPOINT: str = "https://models.github.ai/inference"
+
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_origins(cls, v: str | list[str]) -> list[str]:

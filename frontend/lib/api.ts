@@ -816,3 +816,50 @@ export async function deleteProjectPhase(
     },
   );
 }
+
+// ── AI ────────────────────────────────────────────────────────────
+
+export async function aiGenerateEmail(
+  companyName: string,
+  contactName: string,
+  service: string,
+): Promise<{ email: string }> {
+  return apiFetch<{ email: string }>("/ai/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      company_name: companyName,
+      contact_name: contactName,
+      service: service,
+    }),
+    cache: "no-store",
+  });
+}
+
+export async function aiGenerateProjectDescription(
+  projectName: string,
+  projectType: string,
+  features: string,
+): Promise<{ description: string }> {
+  return apiFetch<{ description: string }>("/ai/project-description", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      project_name: projectName,
+      project_type: projectType,
+      features: features,
+    }),
+    cache: "no-store",
+  });
+}
+
+export async function aiAnalyzeMessage(
+  message: string,
+): Promise<{ analysis: string }> {
+  return apiFetch<{ analysis: string }>("/ai/analyze-message", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+    cache: "no-store",
+  });
+}

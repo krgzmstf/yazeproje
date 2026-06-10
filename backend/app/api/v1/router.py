@@ -10,6 +10,8 @@ from app.api.v1.endpoints.upload import router as upload_router
 from app.api.v1.endpoints.settings import router as settings_router
 from app.api.v1.endpoints.products import router as products_router
 from app.api.v1.endpoints.websockets import router as websocket_router
+from app.api.v1.endpoints.backup import router as backup_router
+from app.api.v1.endpoints.ai import router as ai_router
 
 api_router = APIRouter()
 
@@ -28,3 +30,5 @@ api_router.include_router(upload_router, prefix="/upload", tags=["Upload"])
 api_router.include_router(settings_router, prefix="/settings", tags=["Settings"])
 api_router.include_router(products_router, prefix="/software", tags=["Software Products"])
 api_router.include_router(websocket_router, tags=["WebSockets"])
+api_router.include_router(backup_router, prefix="/backup", tags=["Backup"])
+api_router.include_router(ai_router, prefix="/ai", tags=["AI"])

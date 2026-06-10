@@ -20,6 +20,10 @@ python-multipart==0.0.20
 redis==4.6.0
 fastapi-cache2[redis]==0.2.1
 
+# ── AI / GitHub Models ───────────────────────────────────────────
+azure-ai-inference==1.0.0b9
+azure-core==1.32.0
+
 # ── HTTP / Scraping ──────────────────────────────────────────────
 httpx==0.28.1
 beautifulsoup4==4.12.3
